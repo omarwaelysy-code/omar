@@ -19,6 +19,7 @@ import { InlineActivityLog } from '../components/InlineActivityLog';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { ExportButtons } from '../components/ExportButtons';
+import { ExcelImportWizard } from '../components/ExcelImportWizard';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { printDocument } from '../utils/printEngine';
 import { TransactionManager } from '../services/TransactionManager';
@@ -39,6 +40,7 @@ export const Receipts: React.FC = () => {
   const { showNotification } = useNotification();
   const { pendingViewDoc, setPendingViewDoc, setCurrentPage } = useNavigation();
   const [receipts, setReceipts] = useState<ReceiptVoucher[]>([]);
+  const [showImportWizard, setShowImportWizard] = useState(false);
   const [reversingReceipt, setReversingReceipt] = useState<ReceiptVoucher | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -2214,6 +2216,14 @@ export const Receipts: React.FC = () => {
           >
             <Plus size={14} />
             <span>{language === 'ar' ? 'إضافة قبض من عميل' : 'Add Customer Receipt'}</span>
+          </button>
+          <button
+            onClick={() => setShowImportWizard(true)}
+            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white text-emerald-700 border border-emerald-300 rounded-xl font-bold text-xs hover:bg-emerald-50 transition-all active:scale-95 shadow-xs"
+            title="استيراد من Excel"
+          >
+            <FileSpreadsheet size={14} />
+            <span className="hidden md:inline">استيراد Excel</span>
           </button>
           <ExportButtons 
             size="sm"
@@ -4824,6 +4834,20 @@ export const Receipts: React.FC = () => {
           entityName={reversingReceipt.customer_name}
           entityType="customer"
           moduleTitleAr="سند قبض"
+        />
+      )}
+
+      {showImportWizard && (
+        <ExcelImportWizard
+          module="receipt_vouchers"
+          moduleNameAr="سندات القبض"
+          onClose={() => setShowImportWizard(false)}
+          onSuccess={() => {
+            setShowImportWizard(false);
+            dbService.notify('receipt_vouchers');
+            window.dispatchEvent(new CustomEvent('refresh-receipts'));
+            window.dispatchEvent(new Event('db-change'));
+          }}
         />
       )}
     </div>

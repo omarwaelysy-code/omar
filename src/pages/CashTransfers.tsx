@@ -21,6 +21,7 @@ import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { formatNumber, formatDate, formatMoney, parseNumber } from '../utils/formatUtils';
 import { ExportButtons } from '../components/ExportButtons';
+import { ExcelImportWizard } from '../components/ExcelImportWizard';
 import { PaginationControls } from '../components/PaginationControls';
 import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
 import { ReversalModal } from '../components/common/ReversalModal';
@@ -89,6 +90,7 @@ export const CashTransfers: React.FC = () => {
   const { showNotification } = useNotification();
   const { setPendingViewDoc, setCurrentPage } = useNavigation();
   const [transfers, setTransfers] = useState<CashTransfer[]>([]);
+  const [showImportWizard, setShowImportWizard] = useState(false);
   const [reversingTransfer, setReversingTransfer] = useState<CashTransfer | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -1066,6 +1068,14 @@ export const CashTransfers: React.FC = () => {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowImportWizard(true)}
+            className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-white text-emerald-700 border border-emerald-300 rounded-2xl font-bold text-sm hover:bg-emerald-50 transition-all active:scale-95 shadow-xs"
+            title="استيراد من Excel"
+          >
+            <FileSpreadsheet size={18} />
+            <span>استيراد Excel</span>
+          </button>
           <ExportButtons 
             onExportExcel={handleExportExcel}
             onExportPDF={handleExportPDF}
@@ -2461,6 +2471,20 @@ export const CashTransfers: React.FC = () => {
           entityName={`${reversingTransfer.from_payment_method_name} ➔ ${reversingTransfer.to_payment_method_name}`}
           entityType="general"
           moduleTitleAr="تحويل خزائن ونقدية"
+        />
+      )}
+
+      {showImportWizard && (
+        <ExcelImportWizard
+          module="cash_transfers"
+          moduleNameAr="تحويلات النقدية والخزائن"
+          onClose={() => setShowImportWizard(false)}
+          onSuccess={() => {
+            setShowImportWizard(false);
+            dbService.notify('cash_transfers');
+            window.dispatchEvent(new CustomEvent('refresh-cash-transfers'));
+            window.dispatchEvent(new Event('db-change'));
+          }}
         />
       )}
     </div>

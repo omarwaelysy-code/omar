@@ -20,6 +20,7 @@ import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { ExportButtons } from '../components/ExportButtons';
+import { ExcelImportWizard } from '../components/ExcelImportWizard';
 import { printDocument } from '../utils/printEngine';
 import { TransactionManager } from '../services/TransactionManager';
 import { VoucherSchema, JournalEntrySchema } from '../lib/schemas';
@@ -47,6 +48,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
   const { showNotification } = useNotification();
   const { pendingViewDoc, setPendingViewDoc, setCurrentPage } = useNavigation();
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [showImportWizard, setShowImportWizard] = useState(false);
   const [reversingVoucher, setReversingVoucher] = useState<any | null>(null);
   const [companyCurrencies, setCompanyCurrencies] = useState<Currency[]>([]);
   const [exchangeRateType, setExchangeRateType] = useState<'manual' | 'auto'>('manual');
@@ -2426,6 +2428,14 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
           >
             <Plus size={14} />
             <span>{language === 'ar' ? 'إضافة صرف لمورد' : 'Add Supplier Voucher'}</span>
+          </button>
+          <button
+            onClick={() => setShowImportWizard(true)}
+            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white text-emerald-700 border border-emerald-300 rounded-xl font-bold text-xs hover:bg-emerald-50 transition-all active:scale-95 shadow-xs"
+            title="استيراد من Excel"
+          >
+            <FileSpreadsheet size={14} />
+            <span className="hidden md:inline">استيراد Excel</span>
           </button>
           <ExportButtons 
             size="sm"
@@ -5089,6 +5099,20 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
           entityName={reversingVoucher.supplier_name || reversingVoucher.category_name}
           entityType="supplier"
           moduleTitleAr="سند صرف"
+        />
+      )}
+
+      {showImportWizard && (
+        <ExcelImportWizard
+          module="payment_vouchers"
+          moduleNameAr="سندات الصرف"
+          onClose={() => setShowImportWizard(false)}
+          onSuccess={() => {
+            setShowImportWizard(false);
+            dbService.notify('payment_vouchers');
+            window.dispatchEvent(new CustomEvent('refresh-payment-vouchers'));
+            window.dispatchEvent(new Event('db-change'));
+          }}
         />
       )}
     </div>

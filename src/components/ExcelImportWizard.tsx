@@ -218,7 +218,7 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
                 </div>
 
                 {/* تنبيه باللون الأحمر بحذف المثال */}
-                {['journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods'].includes(module) && (
+                {['journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods', 'opening_stock_balances', 'stock_adjustments', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers', 'customer_discounts', 'supplier_discounts'].includes(module) && (
                   <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-4 flex items-start gap-3 shadow-sm">
                     <AlertTriangle className="text-red-600 shrink-0 mt-0.5" size={22} />
                     <div className="text-sm text-red-800 space-y-1">
@@ -244,7 +244,7 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
                     <div className="text-sm text-amber-800 space-y-1">
                       <p className="font-bold">تعليمات مهمة:</p>
                       <ul className="list-disc list-inside space-y-1 text-amber-700">
-                        {['journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods'].includes(module) && (
+                        {['journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods', 'opening_stock_balances', 'stock_adjustments', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers', 'customer_discounts', 'supplier_discounts'].includes(module) && (
                           <li className="text-red-600 font-black">
                             ⚠️ احذف صفوف المثال التوضيحي المرفقة بالنموذج قبل حفظ الملف ورفعه إلى النظام
                           </li>
@@ -258,6 +258,31 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
                             <li>يجب تكرار بيانات القيد (رقم المرجع، التاريخ، الحساب والحساب الفرعي إن كان مطلوباً، بيانات العملية) في كل سطر يحتوي على القيد</li>
                             <li>لا يتم الرفع في حالة أن الحسابات غير صحيحة أو إذا كان الحساب يلزم له حساب فرعي ولم يتم إدخاله</li>
                             <li>يجب أن يتساوى إجمالي المدين والدائن لكل قيد (لكل رقم مرجع)</li>
+                          </>
+                        ) : ['opening_stock_balances', 'stock_adjustments'].includes(module) ? (
+                          <>
+                            <li>العمود الأول يحدد رقم المرجع / السند (لتجميع أسطر نفس السند معاً)</li>
+                            <li>يجب أن تكون أكواد الأصناف والمستودعات مسجلة مسبقاً في النظام</li>
+                            <li>يجب أن تكون حسابات المخزون والمقابل مسجلة ومطابقة لدليل الحسابات</li>
+                            <li>الكميات يجب أن تكون موجبة لأرصدة أول المدة، وبإشارة موجب/سالب لأذون التسوية</li>
+                          </>
+                        ) : ['receipt_vouchers', 'payment_vouchers'].includes(module) ? (
+                          <>
+                            <li>طريقة السداد / الخزينة يجب أن تكون مسجلة ومربوطة بحساب نقدي بدليل الحسابات</li>
+                            <li>يجب تحديد نوع الجهة (عميل / مورد / مصروف / حساب عام) وكودها الصحيح المسجل بالنظام</li>
+                            <li>المبلغ يجب أن يكون أكبر من صفر</li>
+                          </>
+                        ) : module === 'cash_transfers' ? (
+                          <>
+                            <li>يجب تحديد الخزينة/البنك المحول منه والمحول إليه بدقة مع ربطهما بحسابات مسجلة</li>
+                            <li>لا يمكن أن تكون جهة التحويل وجهة الاستلام متطابقتين</li>
+                            <li>المبلغ المحول يجب أن يكون أكبر من صفر</li>
+                          </>
+                        ) : ['customer_discounts', 'supplier_discounts'].includes(module) ? (
+                          <>
+                            <li>يجب أن يكون العميل / المورد مسجلاً بالنظام ومربوطاً بحساب محاسبي</li>
+                            <li>يجب أن يكون كود حساب الخصم صحيحاً ومسجلاً بدليل الحسابات</li>
+                            <li>مبلغ الخصم يجب أن يكون أكبر من صفر</li>
                           </>
                         ) : (
                           <>
@@ -286,7 +311,7 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
             {/* ── STEP 2: Upload ── */}
             {step === 'upload' && (
               <motion.div key="upload" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
-                {['journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods'].includes(module) && (
+                {['journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods', 'opening_stock_balances', 'stock_adjustments', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers', 'customer_discounts', 'supplier_discounts'].includes(module) && (
                   <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center justify-center gap-2 text-center text-xs sm:text-sm font-black text-red-700">
                     <AlertTriangle className="text-red-600 shrink-0" size={18} />
                     <span>تذكير: تأكد من حذف صفوف الأمثلة التوضيحية من ملف Excel قبل رفعه حتى لا يتم إدخال بيانات تجريبية.</span>

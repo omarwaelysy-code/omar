@@ -15,6 +15,7 @@ import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils'
 import { exportToExcel } from '../utils/excelUtils';
 import { PaginationControls } from '../components/PaginationControls';
 import { ExportButtons } from '../components/ExportButtons';
+import { ExcelImportWizard } from '../components/ExcelImportWizard';
 import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
 import { ReversalModal } from '../components/common/ReversalModal';
 import { ReversalBanner } from '../components/common/ReversalBanner';
@@ -24,6 +25,7 @@ export const SupplierDiscounts: React.FC = () => {
   const { showNotification } = useNotification();
   const { t, dir, language } = useLanguage();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [showImportWizard, setShowImportWizard] = useState(false);
   const [reversingDiscount, setReversingDiscount] = useState<any | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [discounts, setDiscounts] = useState<any[]>([]);
@@ -793,6 +795,15 @@ export const SupplierDiscounts: React.FC = () => {
           >
             <Plus size={14} />
             <span>إضافة خصم لمورد</span>
+          </button>
+
+          <button
+            onClick={() => setShowImportWizard(true)}
+            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white text-emerald-700 border border-emerald-300 rounded-lg font-semibold text-xs hover:bg-emerald-50 transition-all shadow-xs active:scale-95"
+            title="استيراد من Excel"
+          >
+            <FileSpreadsheet size={14} />
+            <span>استيراد Excel</span>
           </button>
 
           <ExportButtons 
@@ -1918,6 +1929,19 @@ export const SupplierDiscounts: React.FC = () => {
         category="supplier_discounts"
         documentId={activityLogDocumentId}
       />
+
+      {showImportWizard && (
+        <ExcelImportWizard
+          module="supplier_discounts"
+          moduleNameAr="خصومات الموردين (الخصم المكتسب)"
+          onClose={() => setShowImportWizard(false)}
+          onSuccess={() => {
+            setShowImportWizard(false);
+            dbService.notify('supplier_discounts');
+            window.dispatchEvent(new Event('db-change'));
+          }}
+        />
+      )}
     </div>
   );
 };

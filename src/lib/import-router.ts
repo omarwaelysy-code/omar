@@ -5,6 +5,7 @@ import pool from './postgres';
 import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
 import { ensureUniqueSequenceNumber } from './erp-api';
+import { recordAdjustment } from './cost-engine';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -198,6 +199,124 @@ const IMPORT_CONFIGS: Record<string, {
       { key: 'department_code',  label: 'كود الإدارة',              labelEn: 'Department Code',                              required: false, type: 'text',         example: 'DEP-001' },
       { key: 'line_description', label: 'شرح السطر',               labelEn: 'Line Description',                             required: false, type: 'text',         example: 'شرح تفصيلي للسطر' },
     ]
+  },
+
+  // ── أرصدة المخزون الافتتاحية ─────────────────────────────────────
+  opening_stock_balances: {
+    nameAr: 'أرصدة المخزون الافتتاحية',
+    dbTable: 'opening_stock_balances',
+    uniqueKey: 'document_number',
+    columns: [
+      { key: 'document_number',     label: 'رقم المرجع / السند *',        labelEn: 'Reference / Document Number (Required, e.g. OPB-000001)', required: true,  type: 'text',         example: 'OPB-000001', note: 'رقم يجمع أسطر نفس السند الافتتاحي' },
+      { key: 'date',                label: 'تاريخ السند *',               labelEn: 'Document Date (YYYY-MM-DD, Required)',                    required: true,  type: 'date',         example: '2026-10-17' },
+      { key: 'description',         label: 'البيان العام للسند',           labelEn: 'Document Description',                                    required: false, type: 'text',         example: 'أرصدة أول المدة للمخزون' },
+      { key: 'debit_account_code',  label: 'كود حساب المخزون (المدين) *',  labelEn: 'Inventory Account Code (Debit, Required)',                required: true,  type: 'account_code', example: '1115',       note: 'حساب بضاعة أول المدة أو المخزون بدليل الحسابات' },
+      { key: 'credit_account_code', label: 'كود حساب المقابل (الدائن) *',  labelEn: 'Counter Account Code (Credit, Required)',                 required: true,  type: 'account_code', example: '31',         note: 'حساب رأس المال أو الأرباح المحتجزة / أرصدة افتتاحية' },
+      { key: 'product_code',        label: 'كود الصنف *',                 labelEn: 'Product Code (Required)',                                 required: true,  type: 'text',         example: 'PROD-001',   note: 'كود الصنف المسجل في بطاقات الأصناف' },
+      { key: 'warehouse_name',      label: 'اسم أو كود المستودع *',       labelEn: 'Warehouse Name or Code (Required)',                       required: true,  type: 'text',         example: 'المستودع الرئيسي' },
+      { key: 'quantity',            label: 'الكمية *',                    labelEn: 'Quantity (Positive number > 0)',                          required: true,  type: 'number',       example: '50' },
+      { key: 'unit_cost',           label: 'تكلفة الوحدة *',              labelEn: 'Unit Cost (>= 0)',                                        required: true,  type: 'number',       example: '100' },
+      { key: 'notes',               label: 'ملاحظات السطر',               labelEn: 'Item Notes',                                              required: false, type: 'text',         example: 'رصيد مستودع رئيسي' },
+    ]
+  },
+
+  // ── تسويات المخزون (أذون التسوية) ────────────────────────────────
+  stock_adjustments: {
+    nameAr: 'تسويات المخزون',
+    dbTable: 'stock_adjustments',
+    uniqueKey: 'adjustment_number',
+    columns: [
+      { key: 'adjustment_number',   label: 'رقم المرجع / إذن التسوية *',   labelEn: 'Adjustment / Reference Number (Required, e.g. ADJ-000001)', required: true,  type: 'text',         example: 'ADJ-000001', note: 'رقم يجمع أسطر إذن التسوية الواحد' },
+      { key: 'date',                label: 'تاريخ التسوية *',              labelEn: 'Adjustment Date (YYYY-MM-DD, Required)',                    required: true,  type: 'date',         example: '2026-10-17' },
+      { key: 'description',         label: 'البيان العام للتسوية',          labelEn: 'Adjustment Description',                                    required: false, type: 'text',         example: 'تسوية فروقات جردية' },
+      { key: 'account_code',        label: 'كود حساب فروقات الجرد *',      labelEn: 'Adjustment Account Code (Required)',                        required: true,  type: 'account_code', example: '512',        note: 'حساب أرباح وخسائر التسويات أو فروقات الجرد' },
+      { key: 'product_code',        label: 'كود الصنف *',                 labelEn: 'Product Code (Required)',                                   required: true,  type: 'text',         example: 'PROD-001' },
+      { key: 'warehouse_name',      label: 'اسم أو كود المستودع *',       labelEn: 'Warehouse Name or Code (Required)',                         required: true,  type: 'text',         example: 'المستودع الرئيسي' },
+      { key: 'quantity',            label: 'كمية الفرق (+ زيادة / - عجز) *', labelEn: 'Discrepancy Quantity (+ for gain, - for loss)',          required: true,  type: 'number',       example: '5' },
+      { key: 'unit_cost',           label: 'تكلفة الوحدة *',              labelEn: 'Unit Cost (>= 0)',                                          required: true,  type: 'number',       example: '50' },
+      { key: 'notes',               label: 'ملاحظات السطر',               labelEn: 'Item Notes',                                                required: false, type: 'text',         example: 'زيادة جردية فعلية' },
+    ]
+  },
+
+  // ── سندات القبض ─────────────────────────────────────────────────
+  receipt_vouchers: {
+    nameAr: 'سندات القبض',
+    dbTable: 'receipt_vouchers',
+    uniqueKey: 'voucher_number',
+    columns: [
+      { key: 'voucher_number',      label: 'رقم السند',                   labelEn: 'Voucher Number (Optional, auto-generated if blank)',        required: false, type: 'text',         example: 'RV-000001' },
+      { key: 'date',                label: 'تاريخ السند *',               labelEn: 'Voucher Date (YYYY-MM-DD, Required)',                       required: true,  type: 'date',         example: '2026-10-17' },
+      { key: 'amount',              label: 'المبلغ *',                    labelEn: 'Amount (Required, > 0)',                                    required: true,  type: 'number',       example: '5000' },
+      { key: 'payment_method_name', label: 'طريقة السداد / الخزينة *',    labelEn: 'Payment Method / Cash / Bank Name (Required)',              required: true,  type: 'text',         example: 'الخزينة الرئيسية' },
+      { key: 'entity_type',         label: 'نوع جهة القبض *',             labelEn: 'Entity Type: customer | supplier | account',                required: true,  type: 'select',       options: ['customer', 'supplier', 'account'], example: 'customer' },
+      { key: 'entity_code',         label: 'كود / اسم العميل أو المورد أو الحساب *', labelEn: 'Customer/Supplier Code or Account Code (Required)', required: true,  type: 'text',         example: 'CUST-001' },
+      { key: 'description',         label: 'البيان',                      labelEn: 'Description',                                               required: false, type: 'text',         example: 'تحصيل دفعة نقدية' },
+      { key: 'manual_reference',    label: 'المرجع الورقي / اليدوي',      labelEn: 'Manual / Paper Reference Number',                           required: false, type: 'text',         example: 'REC-101' },
+    ]
+  },
+
+  // ── سندات الصرف ─────────────────────────────────────────────────
+  payment_vouchers: {
+    nameAr: 'سندات الصرف',
+    dbTable: 'payment_vouchers',
+    uniqueKey: 'voucher_number',
+    columns: [
+      { key: 'voucher_number',      label: 'رقم السند',                   labelEn: 'Voucher Number (Optional, auto-generated if blank)',        required: false, type: 'text',         example: 'PV-000001' },
+      { key: 'date',                label: 'تاريخ السند *',               labelEn: 'Voucher Date (YYYY-MM-DD, Required)',                       required: true,  type: 'date',         example: '2026-10-17' },
+      { key: 'amount',              label: 'المبلغ *',                    labelEn: 'Amount (Required, > 0)',                                    required: true,  type: 'number',       example: '3000' },
+      { key: 'payment_method_name', label: 'طريقة السداد / الخزينة *',    labelEn: 'Payment Method / Cash / Bank Name (Required)',              required: true,  type: 'text',         example: 'الخزينة الرئيسية' },
+      { key: 'paid_to_type',        label: 'جهة الصرف *',                 labelEn: 'Paid To Type: supplier | expense | customer | account',     required: true,  type: 'select',       options: ['supplier', 'expense', 'customer', 'account'], example: 'supplier' },
+      { key: 'entity_code',         label: 'كود / اسم المورد أو بند المصروف أو الحساب *', labelEn: 'Supplier/Expense Code or Account Code (Required)', required: true,  type: 'text',         example: 'SUPP-001' },
+      { key: 'description',         label: 'البيان',                      labelEn: 'Description',                                               required: false, type: 'text',         example: 'سداد دفعة نقدية' },
+      { key: 'manual_reference',    label: 'المرجع الورقي / اليدوي',      labelEn: 'Manual / Paper Reference Number',                           required: false, type: 'text',         example: 'PAY-101' },
+    ]
+  },
+
+  // ── تحويلات النقدية والخزائن ─────────────────────────────────────
+  cash_transfers: {
+    nameAr: 'تحويلات النقدية والخزائن',
+    dbTable: 'cash_transfers',
+    uniqueKey: 'transfer_number',
+    columns: [
+      { key: 'transfer_number',           label: 'رقم التحويل',              labelEn: 'Transfer Number (Optional, auto-generated if blank)',   required: false, type: 'text',         example: 'TR-000001' },
+      { key: 'date',                      label: 'تاريخ التحويل *',          labelEn: 'Transfer Date (YYYY-MM-DD, Required)',                  required: true,  type: 'date',         example: '2026-10-17' },
+      { key: 'amount',                    label: 'المبلغ المحول *',          labelEn: 'Amount (Required, > 0)',                                required: true,  type: 'number',       example: '10000' },
+      { key: 'from_payment_method_name',  label: 'من خزينة / بنك (المحول) *', labelEn: 'From Cash / Bank (Required)',                           required: true,  type: 'text',         example: 'الخزينة الرئيسية' },
+      { key: 'to_payment_method_name',    label: 'إلى خزينة / بنك (المستلم) *', labelEn: 'To Cash / Bank (Required)',                          required: true,  type: 'text',         example: 'البنك الأهلي' },
+      { key: 'description',               label: 'البيان / سبب التحويل',     labelEn: 'Description',                                           required: false, type: 'text',         example: 'إيداع نقدي بالبنك من الخزينة' },
+    ]
+  },
+
+  // ── خصومات العملاء (الخصم المسموح به) ───────────────────────────
+  customer_discounts: {
+    nameAr: 'خصومات العملاء (المسموح به)',
+    dbTable: 'customer_discounts',
+    uniqueKey: 'number',
+    columns: [
+      { key: 'number',        label: 'رقم إشعار الخصم',             labelEn: 'Discount Number (Optional, auto-generated if blank)',   required: false, type: 'text',         example: 'CDISC-00001' },
+      { key: 'date',          label: 'تاريخ الخصم *',               labelEn: 'Discount Date (YYYY-MM-DD, Required)',                  required: true,  type: 'date',         example: '2026-10-17' },
+      { key: 'customer_code', label: 'كود أو اسم العميل *',         labelEn: 'Customer Code or Name (Required)',                      required: true,  type: 'text',         example: 'CUST-001' },
+      { key: 'amount',        label: 'مبلغ الخصم *',                labelEn: 'Discount Amount (Required, > 0)',                       required: true,  type: 'number',       example: '500' },
+      { key: 'account_code',  label: 'كود حساب الخصم المسموح به *', labelEn: 'Discount Expense Account Code (Required)',              required: true,  type: 'account_code', example: '412', note: 'حساب الخصم المسموح به بدليل الحسابات' },
+      { key: 'description',   label: 'البيان / سبب الخصم',          labelEn: 'Description',                                           required: false, type: 'text',         example: 'خصم تعجيل دفع' },
+      { key: 'notes',         label: 'ملاحظات إضافية',              labelEn: 'Notes',                                                 required: false, type: 'text',         example: 'موافقة الإدارة' },
+    ]
+  },
+
+  // ── خصومات الموردين (الخصم المكتسب) ─────────────────────────────
+  supplier_discounts: {
+    nameAr: 'خصومات الموردين (الخصم المكتسب)',
+    dbTable: 'supplier_discounts',
+    uniqueKey: 'number',
+    columns: [
+      { key: 'number',        label: 'رقم إشعار الخصم',             labelEn: 'Discount Number (Optional, auto-generated if blank)',   required: false, type: 'text',         example: 'SDISC-00001' },
+      { key: 'date',          label: 'تاريخ الخصم *',               labelEn: 'Discount Date (YYYY-MM-DD, Required)',                  required: true,  type: 'date',         example: '2026-10-17' },
+      { key: 'supplier_code', label: 'كود أو اسم المورد *',         labelEn: 'Supplier Code or Name (Required)',                      required: true,  type: 'text',         example: 'SUPP-001' },
+      { key: 'amount',        label: 'مبلغ الخصم *',                labelEn: 'Discount Amount (Required, > 0)',                       required: true,  type: 'number',       example: '800' },
+      { key: 'account_code',  label: 'كود حساب الخصم المكتسب *',    labelEn: 'Earned Discount Account Code (Required)',               required: true,  type: 'account_code', example: '512', note: 'حساب الخصم المكتسب بدليل الحسابات' },
+      { key: 'description',   label: 'البيان / سبب الخصم',          labelEn: 'Description',                                           required: false, type: 'text',         example: 'خصم كمية من المورد' },
+      { key: 'notes',         label: 'ملاحظات إضافية',              labelEn: 'Notes',                                                 required: false, type: 'text',         example: 'تسوية سنوية' },
+    ]
   }
 };
 
@@ -232,6 +351,9 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
   let sampleCust = { code: 'CUST-001', name: 'شركة الأمل للتجارة' };
   let sampleSupp = { code: 'SUPP-001', name: 'شركة التوريدات الحديثة' };
   let samplePm   = { name: 'الخزينة الرئيسية', type: 'cash' };
+  let sampleProd = { code: 'PROD-001', name: 'لابتوب ديل للأعمال' };
+  let sampleWh   = { id: '', code: 'WH-01', name: 'المستودع الرئيسي' };
+  let sampleExp  = { code: 'EXP-001', name: 'مصاريف إيجار' };
 
   try {
     const cRes = await pool.query(`SELECT code, name FROM customers WHERE company_id = $1 ORDER BY id LIMIT 1`, [companyId]);
@@ -240,6 +362,12 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
     if (sRes.rows[0]) sampleSupp = sRes.rows[0];
     const pmRes = await pool.query(`SELECT name, type FROM payment_methods WHERE company_id = $1 ORDER BY id LIMIT 1`, [companyId]);
     if (pmRes.rows[0]) samplePm = pmRes.rows[0];
+    const pRes = await pool.query(`SELECT code, name FROM products WHERE company_id = $1 ORDER BY id LIMIT 1`, [companyId]);
+    if (pRes.rows[0]) sampleProd = pRes.rows[0];
+    const wRes = await pool.query(`SELECT id, code, name FROM warehouses WHERE company_id = $1 ORDER BY id LIMIT 1`, [companyId]);
+    if (wRes.rows[0]) sampleWh = wRes.rows[0];
+    const expRes = await pool.query(`SELECT code, name FROM expense_categories WHERE company_id = $1 ORDER BY id LIMIT 1`, [companyId]);
+    if (expRes.rows[0]) sampleExp = expRes.rows[0];
   } catch (e) { /* non-fatal */ }
 
   const custAccCode = findAccCode(a => a.required_sub_account && (a.name.includes('عملاء') || a.name.toLowerCase().includes('customer')), '111');
@@ -248,6 +376,8 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
   const revAccCode  = findAccCode(a => a.name.includes('إيراد') || a.name.includes('مبيعات') || a.code === '41', '41');
   const costAccCode = findAccCode(a => a.name.includes('تكلفة') || a.code === '51', '51');
   const expAccCode  = findAccCode(a => a.name.includes('مصروف') || a.code === '511', '511');
+  const invAccCode  = findAccCode(a => a.name.includes('مخزون') || a.name.includes('بضاعة') || a.code === '1115', '1115');
+  const capAccCode  = findAccCode(a => a.name.includes('رأس المال') || a.name.includes('افتتاحي') || a.name.includes('أرباح') || a.code === '31', '31');
 
   let exampleRows: any[][] = [];
 
@@ -417,6 +547,96 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
         'الخزينة النقدية الرئيسية للمقر'
       ]
     ];
+  } else if (moduleName === 'opening_stock_balances') {
+    exampleRows = [
+      [
+        'OPB-000001',
+        '2026-10-17',
+        'مثال توضيحي: رصيد أول المدة لمستودع رئيسي (احذف هذا الصف قبل الرفع)',
+        invAccCode,
+        capAccCode,
+        sampleProd.code,
+        sampleWh.name,
+        50,
+        100,
+        'رصيد أول المدة للمستودع'
+      ]
+    ];
+  } else if (moduleName === 'stock_adjustments') {
+    exampleRows = [
+      [
+        'ADJ-000001',
+        '2026-10-17',
+        'مثال توضيحي: إذن تسوية جردية بالزيادة أو العجز (احذف هذا الصف قبل الرفع)',
+        expAccCode,
+        sampleProd.code,
+        sampleWh.name,
+        5,
+        100,
+        'زيادة جردية فعلية'
+      ]
+    ];
+  } else if (moduleName === 'receipt_vouchers') {
+    exampleRows = [
+      [
+        'RV-000001',
+        '2026-10-17',
+        5000,
+        samplePm.name,
+        'customer',
+        sampleCust.code,
+        'مثال توضيحي: سند قبض نقدي من عميل (احذف هذا الصف قبل الرفع)',
+        'REC-101'
+      ]
+    ];
+  } else if (moduleName === 'payment_vouchers') {
+    exampleRows = [
+      [
+        'PV-000001',
+        '2026-10-17',
+        3000,
+        samplePm.name,
+        'supplier',
+        sampleSupp.code,
+        'مثال توضيحي: سند صرف نقدي لمورد (احذف هذا الصف قبل الرفع)',
+        'PAY-101'
+      ]
+    ];
+  } else if (moduleName === 'cash_transfers') {
+    exampleRows = [
+      [
+        'TR-000001',
+        '2026-10-17',
+        10000,
+        samplePm.name,
+        'البنك الأهلي',
+        'مثال توضيحي: تحويل من الخزينة إلى البنك (احذف هذا الصف قبل الرفع)'
+      ]
+    ];
+  } else if (moduleName === 'customer_discounts') {
+    exampleRows = [
+      [
+        'CDISC-00001',
+        '2026-10-17',
+        sampleCust.code,
+        500,
+        revAccCode,
+        'مثال توضيحي: خصم مسموح به لعميل (احذف هذا الصف قبل الرفع)',
+        'خصم تعجيل سداد'
+      ]
+    ];
+  } else if (moduleName === 'supplier_discounts') {
+    exampleRows = [
+      [
+        'SDISC-00001',
+        '2026-10-17',
+        sampleSupp.code,
+        800,
+        costAccCode,
+        'مثال توضيحي: خصم مكتسب من مورد (احذف هذا الصف قبل الرفع)',
+        'خصم كمية سنوي'
+      ]
+    ];
   }
 
   // ── Data Sheet: Header on Row 0, Example Rows follow directly from Row 1 ──
@@ -482,9 +702,10 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
     XLSX.utils.book_append_sheet(wb, wsAcc, 'دليل الحسابات');
   }
 
-  // ── Additional Reference Sheets for Journal Entries ───────────
-  if (moduleName === 'journal_entries') {
-    try {
+  // ── Additional Reference Sheets ──────────────────────────────
+  try {
+    // 1. العملاء
+    if (['journal_entries', 'receipt_vouchers', 'payment_vouchers', 'customer_discounts'].includes(moduleName)) {
       const custRes = await pool.query(`SELECT code, name FROM customers WHERE company_id = $1 ORDER BY code`, [companyId]);
       if (custRes.rows.length > 0) {
         const cData = [['كود العميل', 'اسم العميل'], ...custRes.rows.map(c => [c.code, c.name])];
@@ -492,7 +713,10 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
         wsC['!cols'] = [{ wch: 18 }, { wch: 35 }];
         XLSX.utils.book_append_sheet(wb, wsC, 'العملاء');
       }
+    }
 
+    // 2. الموردين
+    if (['journal_entries', 'receipt_vouchers', 'payment_vouchers', 'supplier_discounts'].includes(moduleName)) {
       const suppRes = await pool.query(`SELECT code, name FROM suppliers WHERE company_id = $1 ORDER BY code`, [companyId]);
       if (suppRes.rows.length > 0) {
         const sData = [['كود المورد', 'اسم المورد'], ...suppRes.rows.map(s => [s.code, s.name])];
@@ -500,7 +724,10 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
         wsS['!cols'] = [{ wch: 18 }, { wch: 35 }];
         XLSX.utils.book_append_sheet(wb, wsS, 'الموردين');
       }
+    }
 
+    // 3. طرق السداد والخزن
+    if (['journal_entries', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers'].includes(moduleName)) {
       const pmRes = await pool.query(`SELECT name, type FROM payment_methods WHERE company_id = $1 ORDER BY name`, [companyId]);
       if (pmRes.rows.length > 0) {
         const pmData = [['اسم طريقة السداد / الخزينة', 'النوع'], ...pmRes.rows.map(p => [p.name, p.type])];
@@ -508,7 +735,43 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
         wsPM['!cols'] = [{ wch: 30 }, { wch: 20 }];
         XLSX.utils.book_append_sheet(wb, wsPM, 'طرق السداد والخزن');
       }
+    }
 
+    // 4. المستودعات
+    if (['opening_stock_balances', 'stock_adjustments'].includes(moduleName)) {
+      const whRes = await pool.query(`SELECT code, name FROM warehouses WHERE company_id = $1 ORDER BY name`, [companyId]);
+      if (whRes.rows.length > 0) {
+        const whData = [['كود المستودع', 'اسم المستودع'], ...whRes.rows.map(w => [w.code || '-', w.name])];
+        const wsWH = XLSX.utils.aoa_to_sheet(whData);
+        wsWH['!cols'] = [{ wch: 18 }, { wch: 35 }];
+        XLSX.utils.book_append_sheet(wb, wsWH, 'المستودعات');
+      }
+    }
+
+    // 5. الأصناف
+    if (['opening_stock_balances', 'stock_adjustments'].includes(moduleName)) {
+      const prRes = await pool.query(`SELECT code, name, unit FROM products WHERE company_id = $1 ORDER BY code`, [companyId]);
+      if (prRes.rows.length > 0) {
+        const prData = [['كود الصنف', 'اسم الصنف', 'وحدة القياس'], ...prRes.rows.map(p => [p.code, p.name, p.unit || 'قطعة'])];
+        const wsPR = XLSX.utils.aoa_to_sheet(prData);
+        wsPR['!cols'] = [{ wch: 18 }, { wch: 35 }, { wch: 15 }];
+        XLSX.utils.book_append_sheet(wb, wsPR, 'الأصناف');
+      }
+    }
+
+    // 6. بنود المصروفات
+    if (['payment_vouchers'].includes(moduleName)) {
+      const expCatRes = await pool.query(`SELECT code, name FROM expense_categories WHERE company_id = $1 ORDER BY code`, [companyId]);
+      if (expCatRes.rows.length > 0) {
+        const expData = [['كود البند', 'اسم بند المصروف'], ...expCatRes.rows.map(e => [e.code, e.name])];
+        const wsExp = XLSX.utils.aoa_to_sheet(expData);
+        wsExp['!cols'] = [{ wch: 18 }, { wch: 35 }];
+        XLSX.utils.book_append_sheet(wb, wsExp, 'بنود المصروفات');
+      }
+    }
+
+    // 7. العمليات
+    if (moduleName === 'journal_entries') {
       const opRes = await pool.query(`SELECT operation_number, description FROM operations WHERE company_id = $1 ORDER BY operation_number`, [companyId]);
       if (opRes.rows.length > 0) {
         const opData = [['رقم العملية', 'البيان'], ...opRes.rows.map(o => [o.operation_number, o.description])];
@@ -516,11 +779,15 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
         wsOp['!cols'] = [{ wch: 20 }, { wch: 35 }];
         XLSX.utils.book_append_sheet(wb, wsOp, 'العمليات');
       }
-    } catch (e) { /* non-fatal */ }
-  }
+    }
+  } catch (e) { /* non-fatal */ }
 
   // ── Instructions Sheet ────────────────────────────────────────
-  const hasExampleRow = ['journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods'].includes(moduleName);
+  const hasExampleRow = [
+    'journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods',
+    'opening_stock_balances', 'stock_adjustments', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers', 'customer_discounts', 'supplier_discounts'
+  ].includes(moduleName);
+
   const instructions = [
     ['تعليمات الاستيراد - ' + config.nameAr],
     ...(hasExampleRow ? [
@@ -542,6 +809,55 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
       ['   → راجع ورقة "دليل الحسابات" لمعرفة الحسابات التي يلزم لها حساب فرعي (عمود "يلزم حساب فرعي")'],
       ['   → يمكن إدخال كود أو اسم العميل / المورد / الخزينة في عمود الحساب الفرعي'],
       ['11. تنسيق التواريخ: YYYY-MM-DD (مثال: 2026-01-01)'],
+    ] : moduleName === 'opening_stock_balances' ? [
+      ['4. العمود الأول "رقم المرجع / السند *" يحدد السند الذي ينتمي له كل صنف (مثال: OPB-000001)'],
+      ['5. يمكن إدخال سند واحد أو عدة سندات في نفس الملف مع تكرار بيانات السند (رقم السند، التاريخ، الحسابات) لأسطر نفس السند'],
+      ['6. كود حساب المخزون وكود حساب المقابل يجب أن يكونا مسجلين في دليل الحسابات (راجع ورقة "دليل الحسابات")'],
+      ['7. كود الصنف يجب أن يكون مسجلاً في النظام (راجع ورقة "الأصناف")'],
+      ['8. اسم أو كود المستودع يجب أن يطابق مستودع موجود في النظام (راجع ورقة "المستودعات")'],
+      ['9. الكميات يجب أن تكون موجبة أكبر من صفر (> 0) والتكلفة لا تقل عن صفر (>= 0)'],
+      ['10. يتم إنشاء القيد المحاسبي وحركات المخزون آلياً فور تنفيذ الاستيراد'],
+      ['11. تنسيق التواريخ: YYYY-MM-DD (مثال: 2026-10-17)'],
+    ] : moduleName === 'stock_adjustments' ? [
+      ['4. العمود الأول "رقم المرجع / إذن التسوية *" يحدد إذن التسوية الذي ينتمي له كل سطر (مثال: ADJ-000001)'],
+      ['5. يمكن إدخال إذن تسوية واحد أو عدة أذون في نفس الملف مع تكرار بيانات الإذن لأسطر نفس التسوية'],
+      ['6. كمية الفرق: أدخل رقماً موجباً (+) للزيادة الجردية، أو رقماً سالباً (-) للعجز الجردي'],
+      ['7. كود حساب فروقات الجرد يجب أن يكون مسجلاً بدليل الحسابات (راجع ورقة "دليل الحسابات")'],
+      ['8. كود الصنف واسم المستودع يجب أن يكونا مسجلين في النظام (راجع ورقتي "الأصناف" و "المستودعات")'],
+      ['9. يتم إنشاء القيد المحاسبي والتسوية المخزنية آلياً فور التنفيذ'],
+      ['10. تنسيق التواريخ: YYYY-MM-DD (مثال: 2026-10-17)'],
+    ] : moduleName === 'receipt_vouchers' ? [
+      ['4. رقم السند اختياري؛ إذا تركته فارغاً سيقوم النظام بتوليد رقم تسلسلي تلقائي (RV-XXXXXX)'],
+      ['5. طريقة السداد / الخزينة: أدخل اسم الخزينة أو البنك المسجل بالنظام (راجع ورقة "طرق السداد والخزن")'],
+      ['6. نوع جهة القبض: اختر customer (عميل) أو supplier (مورد) أو account (حساب عام)'],
+      ['7. كود / اسم الجهة: أدخل كود أو اسم العميل أو المورد أو كود الحساب المقابل (راجع أوراق "العملاء" و "الموردين" و "دليل الحسابات")'],
+      ['8. يتم إنشاء قيد اليومية المقابل لسند القبض تلقائياً وموازنته بالكامل في شجرة الحسابات'],
+      ['9. تنسيق التواريخ: YYYY-MM-DD (مثال: 2026-10-17)'],
+    ] : moduleName === 'payment_vouchers' ? [
+      ['4. رقم السند اختياري؛ إذا تركته فارغاً سيقوم النظام بتوليد رقم تسلسلي تلقائي (PV-XXXXXX)'],
+      ['5. طريقة السداد / الخزينة: أدخل اسم الخزينة أو البنك الصادر منه المبلغ (راجع ورقة "طرق السداد والخزن")'],
+      ['6. جهة الصرف: اختر supplier (مورد) أو expense (مصروف) أو customer (عميل) أو account (حساب عام)'],
+      ['7. كود / اسم الجهة: أدخل كود أو اسم المورد أو بند المصروف أو الحساب (راجع أوراق "الموردين"، "بنود المصروفات"، "دليل الحسابات")'],
+      ['8. يتم إنشاء قيد الصرف المحاسبي تلقائياً وموازنته بالكامل فور التنفيذ'],
+      ['9. تنسيق التواريخ: YYYY-MM-DD (مثال: 2026-10-17)'],
+    ] : moduleName === 'cash_transfers' ? [
+      ['4. رقم التحويل اختياري؛ إذا تركته فارغاً سيقوم النظام بتوليد رقم تسلسلي تلقائي (TR-XXXXXX)'],
+      ['5. أدخل اسم الخزينة/البنك المحول واسم الخزينة/البنك المستلم بدقة (راجع ورقة "طرق السداد والخزن")'],
+      ['6. لا يمكن أن تكون جهة التحويل وجهة الاستلام متطابقتين'],
+      ['7. يتم إنشاء قيد تحويل النقدية بين الحسابين تلقائياً وموازنته'],
+      ['8. تنسيق التواريخ: YYYY-MM-DD (مثال: 2026-10-17)'],
+    ] : moduleName === 'customer_discounts' ? [
+      ['4. رقم إشعار الخصم اختياري؛ إذا تركته فارغاً سيقوم النظام بتوليد رقم تسلسلي تلقائي (CDISC-XXXXX)'],
+      ['5. كود أو اسم العميل يجب أن يطابق عميلاً مسجلاً بالنظام (راجع ورقة "العملاء")'],
+      ['6. كود حساب الخصم المسموح به يجب أن يكون مسجلاً بدليل الحسابات (راجع ورقة "دليل الحسابات")'],
+      ['7. يتم إنشاء قيد الخصم المسموح به تلقائياً (مدين: حساب الخصم، دائن: حساب العميل)'],
+      ['8. تنسيق التواريخ: YYYY-MM-DD (مثال: 2026-10-17)'],
+    ] : moduleName === 'supplier_discounts' ? [
+      ['4. رقم إشعار الخصم اختياري؛ إذا تركته فارغاً سيقوم النظام بتوليد رقم تسلسلي تلقائي (SDISC-XXXXX)'],
+      ['5. كود أو اسم المورد يجب أن يطابق مورداً مسجلاً بالنظام (راجع ورقة "الموردين")'],
+      ['6. كود حساب الخصم المكتسب يجب أن يكون مسجلاً بدليل الحسابات (راجع ورقة "دليل الحسابات")'],
+      ['7. يتم إنشاء قيد الخصم المكتسب تلقائياً (مدين: حساب المورد، دائن: حساب الخصم المكتسب)'],
+      ['8. تنسيق التواريخ: YYYY-MM-DD (مثال: 2026-10-17)'],
     ] : [
       ['4. الأكواد يجب أن تكون فريدة وغير مكررة'],
       ['5. أعمدة "كود الحساب" يجب إدخال كود الحساب الموجود في دليل الحسابات'],
@@ -633,7 +949,21 @@ router.post('/import/validate/:module', authenticateToken, upload.single('file')
                s.includes('cust-example') ||
                s.includes('supp-example') ||
                s.includes('prod-example') ||
-               s.includes('exp-example');
+               s.includes('exp-example') ||
+               s.includes('opb-000001') ||
+               s.includes('adj-000001') ||
+               s.includes('rv-000001') ||
+               s.includes('pv-000001') ||
+               s.includes('tr-000001') ||
+               s.includes('cdisc-00001') ||
+               s.includes('sdisc-00001') ||
+               s.includes('opb-example') ||
+               s.includes('adj-example') ||
+               s.includes('rv-example') ||
+               s.includes('pv-example') ||
+               s.includes('tr-example') ||
+               s.includes('cdisc-example') ||
+               s.includes('sdisc-example');
       });
     };
 
@@ -891,6 +1221,573 @@ router.post('/import/validate/:module', authenticateToken, upload.single('file')
     }
 
     // ================================================================
+    // 1 & 2: OPENING STOCK BALANCES & STOCK ADJUSTMENTS VALIDATION
+    // ================================================================
+    if (moduleName === 'opening_stock_balances' || moduleName === 'stock_adjustments') {
+      const accountsRes = await pool.query('SELECT id, code, name FROM accounts WHERE company_id = $1', [companyId]);
+      const accMap: Record<string, { id: string; code: string; name: string }> = {};
+      accountsRes.rows.forEach(a => { accMap[String(a.code).trim()] = a; });
+
+      const prodRes = await pool.query('SELECT id, code, name, inventory_account_id FROM products WHERE company_id = $1', [companyId]);
+      const prodMapByCode: Record<string, any> = {};
+      const prodMapByName: Record<string, any> = {};
+      prodRes.rows.forEach(p => {
+        if (p.code) prodMapByCode[String(p.code).trim().toLowerCase()] = p;
+        if (p.name) prodMapByName[String(p.name).trim().toLowerCase()] = p;
+      });
+
+      const whRes = await pool.query('SELECT id, code, name FROM warehouses WHERE company_id = $1', [companyId]);
+      const whMap: Record<string, any> = {};
+      whRes.rows.forEach(w => {
+        if (w.name) whMap[String(w.name).trim().toLowerCase()] = w;
+        if (w.code) whMap[String(w.code).trim().toLowerCase()] = w;
+      });
+
+      const validatedRows: { rowNumber: number; data: Record<string, any> }[] = [];
+      const rowsWithErrors: { rowNumber: number; data: Record<string, any>; errors: string[] }[] = [];
+
+      for (const item of dataRowsWithIdx) {
+        const rawRow = item.rawRow;
+        const rowNumber = item.originalRowNumber;
+        const errors: string[] = [];
+        const rowData: Record<string, any> = {};
+
+        for (let colIdx = 0; colIdx < config.columns.length; colIdx++) {
+          const colDef = config.columns[colIdx];
+          let val = rawRow[colIdx];
+          if (typeof val === 'string') val = val.trim();
+
+          if (colDef.type === 'date' && typeof val === 'number') {
+            try {
+              const d = XLSX.SSF.parse_date_code(val);
+              if (d) val = `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
+            } catch { /* ignore */ }
+          }
+
+          const isEmpty = val === undefined || val === null || val === '';
+          if (colDef.required && isEmpty) {
+            errors.push(`الحقل "${colDef.label.replace(' *', '')}" مطلوب`);
+            rowData[colDef.key] = null;
+            continue;
+          }
+          if (isEmpty) {
+            rowData[colDef.key] = colDef.type === 'number' ? 0 : null;
+            continue;
+          }
+
+          if (colDef.type === 'number') {
+            const num = Number(val);
+            if (isNaN(num)) errors.push(`"${colDef.label.replace(' *', '')}" يجب أن يكون رقماً`);
+            else val = num;
+          }
+
+          if (colDef.type === 'date') {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(String(val))) {
+              errors.push(`تاريخ "${val}" يجب أن يكون بتنسيق YYYY-MM-DD`);
+            }
+          }
+
+          rowData[colDef.key] = val;
+        }
+
+        // Product resolution
+        const prodVal = String(rowData.product_code || '').trim().toLowerCase();
+        const prod = prodMapByCode[prodVal] || prodMapByName[prodVal];
+        if (!prod) {
+          errors.push(`الصنف "${rowData.product_code}" غير مسجل في دليل الأصناف`);
+        } else {
+          rowData.product_id = prod.id;
+          rowData.product_name = prod.name;
+          rowData.product_code = prod.code;
+          if (moduleName === 'stock_adjustments' && !prod.inventory_account_id) {
+            errors.push(`الصنف "${prod.name}" ليس له حساب مخزون مرتبط ببطاقته`);
+          }
+        }
+
+        // Warehouse resolution
+        const whVal = String(rowData.warehouse_name || '').trim().toLowerCase();
+        const wh = whMap[whVal];
+        if (!wh) {
+          errors.push(`المستودع "${rowData.warehouse_name}" غير مسجل في دليل المستودعات`);
+        } else {
+          rowData.warehouse_id = wh.id;
+          rowData.warehouse_name = wh.name;
+        }
+
+        // Cost and Quantity validation
+        const qty = Number(rowData.quantity) || 0;
+        const cost = Number(rowData.unit_cost) || 0;
+
+        if (moduleName === 'opening_stock_balances') {
+          if (qty <= 0) errors.push('الكمية يجب أن تكون أكبر من صفر في رصيد أول المدة');
+          if (cost < 0) errors.push('التكلفة لا يمكن أن تكون سالبة');
+
+          // Accounts resolution
+          const debitCode = String(rowData.debit_account_code || '').trim();
+          const creditCode = String(rowData.credit_account_code || '').trim();
+          const debitAcc = accMap[debitCode];
+          const creditAcc = accMap[creditCode];
+
+          if (!debitAcc) errors.push(`كود حساب المخزون المدين "${debitCode}" غير موجود بدليل الحسابات`);
+          else {
+            rowData.debit_account_id = debitAcc.id;
+            rowData.debit_account_name = debitAcc.name;
+          }
+
+          if (!creditAcc) errors.push(`كود حساب المقابل الدائن "${creditCode}" غير موجود بدليل الحسابات`);
+          else {
+            rowData.credit_account_id = creditAcc.id;
+            rowData.credit_account_name = creditAcc.name;
+          }
+        } else {
+          // stock_adjustments
+          if (qty === 0) errors.push('كمية الفرق لا يمكن أن تكون صفراً');
+          if (cost < 0) errors.push('تكلفة الوحدة لا يمكن أن تكون سالبة');
+
+          const accCode = String(rowData.account_code || '').trim();
+          const acc = accMap[accCode];
+          if (!acc) errors.push(`كود حساب فروقات الجرد والتسوية "${accCode}" غير موجود بدليل الحسابات`);
+          else {
+            rowData.account_id = acc.id;
+            rowData.account_name = acc.name;
+          }
+        }
+
+        if (errors.length > 0) {
+          rowsWithErrors.push({ rowNumber, data: rowData, errors });
+        } else {
+          validatedRows.push({ rowNumber, data: rowData });
+        }
+      }
+
+      return res.json({
+        total:       dataRowsWithIdx.length,
+        valid:       validatedRows.length,
+        errors:      rowsWithErrors.length,
+        validRows:   validatedRows,
+        errorRows:   rowsWithErrors,
+        columns:     config.columns.map(c => ({ key: c.key, label: c.label, type: c.type })),
+        moduleConfig: { nameAr: config.nameAr, uniqueKey: config.uniqueKey }
+      });
+    }
+
+    // ================================================================
+    // 3 & 4: RECEIPT & PAYMENT VOUCHERS VALIDATION
+    // ================================================================
+    if (moduleName === 'receipt_vouchers' || moduleName === 'payment_vouchers') {
+      const pmRes = await pool.query('SELECT id, name, account_id FROM payment_methods WHERE company_id = $1', [companyId]);
+      const pmMapByName: Record<string, any> = {};
+      pmRes.rows.forEach(p => { pmMapByName[String(p.name).trim().toLowerCase()] = p; });
+
+      const accountsRes = await pool.query('SELECT id, code, name FROM accounts WHERE company_id = $1', [companyId]);
+      const accMap: Record<string, any> = {};
+      accountsRes.rows.forEach(a => {
+        accMap[String(a.code).trim()] = a;
+        accMap[String(a.name).trim().toLowerCase()] = a;
+      });
+
+      const custRes = await pool.query('SELECT id, code, name, account_id FROM customers WHERE company_id = $1', [companyId]);
+      const custMap: Record<string, any> = {};
+      custRes.rows.forEach(c => {
+        if (c.code) custMap[String(c.code).trim().toLowerCase()] = c;
+        if (c.name) custMap[String(c.name).trim().toLowerCase()] = c;
+      });
+
+      const suppRes = await pool.query('SELECT id, code, name, account_id FROM suppliers WHERE company_id = $1', [companyId]);
+      const suppMap: Record<string, any> = {};
+      suppRes.rows.forEach(s => {
+        if (s.code) suppMap[String(s.code).trim().toLowerCase()] = s;
+        if (s.name) suppMap[String(s.name).trim().toLowerCase()] = s;
+      });
+
+      const expRes = await pool.query('SELECT id, code, name, account_id FROM expense_categories WHERE company_id = $1', [companyId]);
+      const expMap: Record<string, any> = {};
+      expRes.rows.forEach(e => {
+        if (e.code) expMap[String(e.code).trim().toLowerCase()] = e;
+        if (e.name) expMap[String(e.name).trim().toLowerCase()] = e;
+      });
+
+      const validatedRows: { rowNumber: number; data: Record<string, any> }[] = [];
+      const rowsWithErrors: { rowNumber: number; data: Record<string, any>; errors: string[] }[] = [];
+
+      for (const item of dataRowsWithIdx) {
+        const rawRow = item.rawRow;
+        const rowNumber = item.originalRowNumber;
+        const errors: string[] = [];
+        const rowData: Record<string, any> = {};
+
+        for (let colIdx = 0; colIdx < config.columns.length; colIdx++) {
+          const colDef = config.columns[colIdx];
+          let val = rawRow[colIdx];
+          if (typeof val === 'string') val = val.trim();
+
+          if (colDef.type === 'date' && typeof val === 'number') {
+            try {
+              const d = XLSX.SSF.parse_date_code(val);
+              if (d) val = `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
+            } catch { /* ignore */ }
+          }
+
+          const isEmpty = val === undefined || val === null || val === '';
+          if (colDef.required && isEmpty) {
+            errors.push(`الحقل "${colDef.label.replace(' *', '')}" مطلوب`);
+            rowData[colDef.key] = null;
+            continue;
+          }
+          if (isEmpty) {
+            rowData[colDef.key] = colDef.type === 'number' ? 0 : null;
+            continue;
+          }
+
+          if (colDef.type === 'number') {
+            const num = Number(val);
+            if (isNaN(num)) errors.push(`"${colDef.label.replace(' *', '')}" يجب أن يكون رقماً`);
+            else val = num;
+          }
+
+          if (colDef.type === 'date') {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(String(val))) {
+              errors.push(`تاريخ "${val}" يجب أن يكون بتنسيق YYYY-MM-DD`);
+            }
+          }
+
+          rowData[colDef.key] = val;
+        }
+
+        const amount = Number(rowData.amount) || 0;
+        if (amount <= 0) errors.push('المبلغ يجب أن يكون أكبر من صفر');
+
+        // Payment method check
+        const pmName = String(rowData.payment_method_name || '').trim().toLowerCase();
+        const pm = pmMapByName[pmName];
+        if (!pm) {
+          errors.push(`طريقة السداد / الخزينة "${rowData.payment_method_name}" غير مسجلة في النظام`);
+        } else if (!pm.account_id) {
+          errors.push(`طريقة السداد / الخزينة "${pm.name}" غير مربوطة بحساب بدليل الحسابات`);
+        } else {
+          rowData.payment_method_id = pm.id;
+          rowData.payment_method_name = pm.name;
+          rowData.pm_account_id = pm.account_id;
+        }
+
+        // Entity check
+        const entityCode = String(rowData.entity_code || '').trim().toLowerCase();
+        if (moduleName === 'receipt_vouchers') {
+          const type = rowData.entity_type || 'customer';
+          if (type === 'customer') {
+            const cust = custMap[entityCode];
+            if (!cust) errors.push(`العميل "${rowData.entity_code}" غير مسجل بالنظام`);
+            else if (!cust.account_id) errors.push(`العميل "${cust.name}" غير مربوط بحساب محاسبي`);
+            else {
+              rowData.customer_id = cust.id;
+              rowData.customer_name = cust.name;
+              rowData.counter_account_id = cust.account_id;
+            }
+          } else if (type === 'supplier') {
+            const supp = suppMap[entityCode];
+            if (!supp) errors.push(`المورد "${rowData.entity_code}" غير مسجل بالنظام`);
+            else if (!supp.account_id) errors.push(`المورد "${supp.name}" غير مربوط بحساب محاسبي`);
+            else {
+              rowData.supplier_id = supp.id;
+              rowData.supplier_name = supp.name;
+              rowData.counter_account_id = supp.account_id;
+            }
+          } else {
+            // General account
+            const acc = accMap[entityCode];
+            if (!acc) errors.push(`الحساب "${rowData.entity_code}" غير موجود بدليل الحسابات`);
+            else {
+              rowData.account_id = acc.id;
+              rowData.counter_account_id = acc.id;
+            }
+          }
+        } else {
+          // payment_vouchers
+          const type = rowData.paid_to_type || 'supplier';
+          if (type === 'supplier') {
+            const supp = suppMap[entityCode];
+            if (!supp) errors.push(`المورد "${rowData.entity_code}" غير مسجل بالنظام`);
+            else if (!supp.account_id) errors.push(`المورد "${supp.name}" غير مربوط بحساب محاسبي`);
+            else {
+              rowData.supplier_id = supp.id;
+              rowData.supplier_name = supp.name;
+              rowData.counter_account_id = supp.account_id;
+            }
+          } else if (type === 'expense') {
+            const exp = expMap[entityCode];
+            if (!exp) errors.push(`بند المصروف "${rowData.entity_code}" غير مسجل بالنظام`);
+            else if (!exp.account_id) errors.push(`بند المصروف "${exp.name}" غير مربوط بحساب محاسبي`);
+            else {
+              rowData.expense_category_id = exp.id;
+              rowData.category_name = exp.name;
+              rowData.counter_account_id = exp.account_id;
+            }
+          } else if (type === 'customer') {
+            const cust = custMap[entityCode];
+            if (!cust) errors.push(`العميل "${rowData.entity_code}" غير مسجل بالنظام`);
+            else if (!cust.account_id) errors.push(`العميل "${cust.name}" غير مربوط بحساب محاسبي`);
+            else {
+              rowData.customer_id = cust.id;
+              rowData.customer_name = cust.name;
+              rowData.counter_account_id = cust.account_id;
+            }
+          } else {
+            // General account
+            const acc = accMap[entityCode];
+            if (!acc) errors.push(`الحساب "${rowData.entity_code}" غير موجود بدليل الحسابات`);
+            else {
+              rowData.account_id = acc.id;
+              rowData.counter_account_id = acc.id;
+            }
+          }
+        }
+
+        if (errors.length > 0) {
+          rowsWithErrors.push({ rowNumber, data: rowData, errors });
+        } else {
+          validatedRows.push({ rowNumber, data: rowData });
+        }
+      }
+
+      return res.json({
+        total:       dataRowsWithIdx.length,
+        valid:       validatedRows.length,
+        errors:      rowsWithErrors.length,
+        validRows:   validatedRows,
+        errorRows:   rowsWithErrors,
+        columns:     config.columns.map(c => ({ key: c.key, label: c.label, type: c.type })),
+        moduleConfig: { nameAr: config.nameAr, uniqueKey: config.uniqueKey }
+      });
+    }
+
+    // ================================================================
+    // 5: CASH TRANSFERS VALIDATION
+    // ================================================================
+    if (moduleName === 'cash_transfers') {
+      const pmRes = await pool.query('SELECT id, name, account_id FROM payment_methods WHERE company_id = $1', [companyId]);
+      const pmMapByName: Record<string, any> = {};
+      pmRes.rows.forEach(p => { pmMapByName[String(p.name).trim().toLowerCase()] = p; });
+
+      const validatedRows: { rowNumber: number; data: Record<string, any> }[] = [];
+      const rowsWithErrors: { rowNumber: number; data: Record<string, any>; errors: string[] }[] = [];
+
+      for (const item of dataRowsWithIdx) {
+        const rawRow = item.rawRow;
+        const rowNumber = item.originalRowNumber;
+        const errors: string[] = [];
+        const rowData: Record<string, any> = {};
+
+        for (let colIdx = 0; colIdx < config.columns.length; colIdx++) {
+          const colDef = config.columns[colIdx];
+          let val = rawRow[colIdx];
+          if (typeof val === 'string') val = val.trim();
+
+          if (colDef.type === 'date' && typeof val === 'number') {
+            try {
+              const d = XLSX.SSF.parse_date_code(val);
+              if (d) val = `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
+            } catch { /* ignore */ }
+          }
+
+          const isEmpty = val === undefined || val === null || val === '';
+          if (colDef.required && isEmpty) {
+            errors.push(`الحقل "${colDef.label.replace(' *', '')}" مطلوب`);
+            rowData[colDef.key] = null;
+            continue;
+          }
+          if (isEmpty) {
+            rowData[colDef.key] = colDef.type === 'number' ? 0 : null;
+            continue;
+          }
+
+          if (colDef.type === 'number') {
+            const num = Number(val);
+            if (isNaN(num)) errors.push(`"${colDef.label.replace(' *', '')}" يجب أن يكون رقماً`);
+            else val = num;
+          }
+
+          if (colDef.type === 'date') {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(String(val))) {
+              errors.push(`تاريخ "${val}" يجب أن يكون بتنسيق YYYY-MM-DD`);
+            }
+          }
+
+          rowData[colDef.key] = val;
+        }
+
+        const amount = Number(rowData.amount) || 0;
+        if (amount <= 0) errors.push('المبلغ المحول يجب أن يكون أكبر من صفر');
+
+        const fromName = String(rowData.from_payment_method_name || '').trim().toLowerCase();
+        const toName = String(rowData.to_payment_method_name || '').trim().toLowerCase();
+
+        const fromPm = pmMapByName[fromName];
+        const toPm = pmMapByName[toName];
+
+        if (!fromPm) errors.push(`الخزينة/البنك المحول منه "${rowData.from_payment_method_name}" غير مسجل بالنظام`);
+        else if (!fromPm.account_id) errors.push(`الخزينة/البنك المحول منه "${fromPm.name}" غير مربوط بحساب بدليل الحسابات`);
+        else {
+          rowData.from_payment_method_id = fromPm.id;
+          rowData.from_payment_method_name = fromPm.name;
+          rowData.from_account_id = fromPm.account_id;
+        }
+
+        if (!toPm) errors.push(`الخزينة/البنك المحول إليه "${rowData.to_payment_method_name}" غير مسجل بالنظام`);
+        else if (!toPm.account_id) errors.push(`الخزينة/البنك المحول إليه "${toPm.name}" غير مربوط بحساب بدليل الحسابات`);
+        else {
+          rowData.to_payment_method_id = toPm.id;
+          rowData.to_payment_method_name = toPm.name;
+          rowData.to_account_id = toPm.account_id;
+        }
+
+        if (fromPm && toPm && fromPm.id === toPm.id) {
+          errors.push('لا يمكن أن تكون جهة التحويل وجهة الاستلام متطابقتين');
+        }
+
+        if (errors.length > 0) {
+          rowsWithErrors.push({ rowNumber, data: rowData, errors });
+        } else {
+          validatedRows.push({ rowNumber, data: rowData });
+        }
+      }
+
+      return res.json({
+        total:       dataRowsWithIdx.length,
+        valid:       validatedRows.length,
+        errors:      rowsWithErrors.length,
+        validRows:   validatedRows,
+        errorRows:   rowsWithErrors,
+        columns:     config.columns.map(c => ({ key: c.key, label: c.label, type: c.type })),
+        moduleConfig: { nameAr: config.nameAr, uniqueKey: config.uniqueKey }
+      });
+    }
+
+    // ================================================================
+    // 6 & 7: CUSTOMER & SUPPLIER DISCOUNTS VALIDATION
+    // ================================================================
+    if (moduleName === 'customer_discounts' || moduleName === 'supplier_discounts') {
+      const accountsRes = await pool.query('SELECT id, code, name FROM accounts WHERE company_id = $1', [companyId]);
+      const accMap: Record<string, any> = {};
+      accountsRes.rows.forEach(a => {
+        accMap[String(a.code).trim()] = a;
+        accMap[String(a.name).trim().toLowerCase()] = a;
+      });
+
+      const custRes = await pool.query('SELECT id, code, name, account_id FROM customers WHERE company_id = $1', [companyId]);
+      const custMap: Record<string, any> = {};
+      custRes.rows.forEach(c => {
+        if (c.code) custMap[String(c.code).trim().toLowerCase()] = c;
+        if (c.name) custMap[String(c.name).trim().toLowerCase()] = c;
+      });
+
+      const suppRes = await pool.query('SELECT id, code, name, account_id FROM suppliers WHERE company_id = $1', [companyId]);
+      const suppMap: Record<string, any> = {};
+      suppRes.rows.forEach(s => {
+        if (s.code) suppMap[String(s.code).trim().toLowerCase()] = s;
+        if (s.name) suppMap[String(s.name).trim().toLowerCase()] = s;
+      });
+
+      const validatedRows: { rowNumber: number; data: Record<string, any> }[] = [];
+      const rowsWithErrors: { rowNumber: number; data: Record<string, any>; errors: string[] }[] = [];
+
+      for (const item of dataRowsWithIdx) {
+        const rawRow = item.rawRow;
+        const rowNumber = item.originalRowNumber;
+        const errors: string[] = [];
+        const rowData: Record<string, any> = {};
+
+        for (let colIdx = 0; colIdx < config.columns.length; colIdx++) {
+          const colDef = config.columns[colIdx];
+          let val = rawRow[colIdx];
+          if (typeof val === 'string') val = val.trim();
+
+          if (colDef.type === 'date' && typeof val === 'number') {
+            try {
+              const d = XLSX.SSF.parse_date_code(val);
+              if (d) val = `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
+            } catch { /* ignore */ }
+          }
+
+          const isEmpty = val === undefined || val === null || val === '';
+          if (colDef.required && isEmpty) {
+            errors.push(`الحقل "${colDef.label.replace(' *', '')}" مطلوب`);
+            rowData[colDef.key] = null;
+            continue;
+          }
+          if (isEmpty) {
+            rowData[colDef.key] = colDef.type === 'number' ? 0 : null;
+            continue;
+          }
+
+          if (colDef.type === 'number') {
+            const num = Number(val);
+            if (isNaN(num)) errors.push(`"${colDef.label.replace(' *', '')}" يجب أن يكون رقماً`);
+            else val = num;
+          }
+
+          if (colDef.type === 'date') {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(String(val))) {
+              errors.push(`تاريخ "${val}" يجب أن يكون بتنسيق YYYY-MM-DD`);
+            }
+          }
+
+          rowData[colDef.key] = val;
+        }
+
+        const amount = Number(rowData.amount) || 0;
+        if (amount <= 0) errors.push('مبلغ الخصم يجب أن يكون أكبر من صفر');
+
+        // Account check
+        const accCode = String(rowData.account_code || '').trim();
+        const acc = accMap[accCode];
+        if (!acc) errors.push(`كود حساب الخصم "${accCode}" غير موجود بدليل الحسابات`);
+        else {
+          rowData.account_id = acc.id;
+          rowData.account_name = acc.name;
+        }
+
+        if (moduleName === 'customer_discounts') {
+          const custCode = String(rowData.customer_code || '').trim().toLowerCase();
+          const cust = custMap[custCode];
+          if (!cust) errors.push(`العميل "${rowData.customer_code}" غير مسجل بالنظام`);
+          else if (!cust.account_id) errors.push(`العميل "${cust.name}" غير مربوط بحساب بدليل الحسابات`);
+          else {
+            rowData.customer_id = cust.id;
+            rowData.customer_name = cust.name;
+            rowData.counter_account_id = cust.account_id;
+          }
+        } else {
+          // supplier_discounts
+          const suppCode = String(rowData.supplier_code || '').trim().toLowerCase();
+          const supp = suppMap[suppCode];
+          if (!supp) errors.push(`المورد "${rowData.supplier_code}" غير مسجل بالنظام`);
+          else if (!supp.account_id) errors.push(`المورد "${supp.name}" غير مربوط بحساب بدليل الحسابات`);
+          else {
+            rowData.supplier_id = supp.id;
+            rowData.supplier_name = supp.name;
+            rowData.counter_account_id = supp.account_id;
+          }
+        }
+
+        if (errors.length > 0) {
+          rowsWithErrors.push({ rowNumber, data: rowData, errors });
+        } else {
+          validatedRows.push({ rowNumber, data: rowData });
+        }
+      }
+
+      return res.json({
+        total:       dataRowsWithIdx.length,
+        valid:       validatedRows.length,
+        errors:      rowsWithErrors.length,
+        validRows:   validatedRows,
+        errorRows:   rowsWithErrors,
+        columns:     config.columns.map(c => ({ key: c.key, label: c.label, type: c.type })),
+        moduleConfig: { nameAr: config.nameAr, uniqueKey: config.uniqueKey }
+      });
+    }
+
+    // ================================================================
     // STANDARD MODULES VALIDATION (Customers, Suppliers, Products, etc.)
     // ================================================================
     const accountMap: Record<string, { id: string; name: string }> = {};
@@ -1129,6 +2026,622 @@ router.post('/import/execute/:module', authenticateToken, async (req: AuthReques
 
       await client.query('COMMIT');
       return res.json({ success: true, inserted: entriesCount, updated: 0, total: rows.length });
+    }
+
+    // ── OPENING STOCK BALANCES EXECUTE ───────────────────────────
+    if (moduleName === 'opening_stock_balances') {
+      const groups: Record<string, any[]> = {};
+      for (const { data } of rows) {
+        const ref = String(data.document_number || 'OPB-DEFAULT').trim();
+        if (!groups[ref]) groups[ref] = [];
+        groups[ref].push(data);
+      }
+
+      let count = 0;
+      for (const [ref, lines] of Object.entries(groups)) {
+        const docId = uuidv4();
+        const firstLine = lines[0];
+        const dateStr = firstLine.date || new Date().toISOString().split('T')[0];
+        const docNumber = await ensureUniqueSequenceNumber(client, companyId || '', 'opening_stock_balances', dateStr, ref.startsWith('OPB-DEFAULT') ? undefined : ref);
+        const description = firstLine.description || `أرصدة افتتاحية للمخزون - سند رقم ${docNumber}`;
+
+        await client.query(
+          `INSERT INTO "opening_stock_balances" (
+            id, company_id, document_number, date, debit_account_id, debit_account_name,
+            credit_account_id, credit_account_name, description, created_by, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)`,
+          [
+            docId, companyId, docNumber, dateStr,
+            firstLine.debit_account_id, firstLine.debit_account_name || null,
+            firstLine.credit_account_id, firstLine.credit_account_name || null,
+            description, req.user?.id || 'system'
+          ]
+        );
+
+        let totalDocCost = 0;
+        for (const line of lines) {
+          const itemId = uuidv4();
+          const qty = Number(line.quantity) || 0;
+          const cost = Number(line.unit_cost) || 0;
+          const lineTotal = Math.round(qty * cost * 100) / 100;
+          totalDocCost += lineTotal;
+
+          await client.query(
+            `INSERT INTO "opening_stock_items" (
+              id, opening_stock_id, product_id, product_name, product_code,
+              warehouse_id, warehouse_name, quantity, unit_cost, total_cost, company_id, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)`,
+            [
+              itemId, docId, line.product_id, line.product_name, line.product_code,
+              line.warehouse_id, line.warehouse_name, qty, cost, lineTotal, companyId
+            ]
+          );
+
+          if (qty > 0) {
+            await recordAdjustment(
+              client,
+              companyId || '',
+              line.warehouse_id || null,
+              line.product_id,
+              qty,
+              cost,
+              docId,
+              docNumber,
+              dateStr
+            );
+          }
+        }
+
+        totalDocCost = Math.round(totalDocCost * 100) / 100;
+        if (totalDocCost > 0) {
+          const jeId = uuidv4();
+          const entryNumber = await ensureUniqueSequenceNumber(client, companyId || '', 'journal_entries', dateStr);
+          await client.query(
+            `INSERT INTO "journal_entries" (
+              id, company_id, entry_number, date, description,
+              reference_id, reference_type, reference_number,
+              total_debit, total_credit, status, created_by, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'posted', $11, CURRENT_TIMESTAMP)`,
+            [
+              jeId, companyId, entryNumber, dateStr, description,
+              docId, 'opening_stock_balance', docNumber,
+              totalDocCost, totalDocCost, req.user?.id || 'system'
+            ]
+          );
+
+          await client.query(
+            `INSERT INTO "journal_entry_lines" (
+              id, journal_entry_id, company_id, account_id, account_name,
+              debit, credit, description, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, 0, $7, CURRENT_TIMESTAMP)`,
+            [
+              uuidv4(), jeId, companyId, firstLine.debit_account_id, firstLine.debit_account_name || 'حساب المخزون',
+              totalDocCost, `رصيد أول المدة للمخزون - سند رقم ${docNumber}`
+            ]
+          );
+
+          await client.query(
+            `INSERT INTO "journal_entry_lines" (
+              id, journal_entry_id, company_id, account_id, account_name,
+              debit, credit, description, created_at
+            ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, CURRENT_TIMESTAMP)`,
+            [
+              uuidv4(), jeId, companyId, firstLine.credit_account_id, firstLine.credit_account_name || 'حساب مقابل أرصدة أول المدة',
+              totalDocCost, `رصيد أول المدة للمخزون - سند رقم ${docNumber}`
+            ]
+          );
+        }
+
+        count++;
+      }
+
+      await client.query('COMMIT');
+      return res.json({ success: true, inserted: count, updated: 0, total: rows.length });
+    }
+
+    // ── STOCK ADJUSTMENTS EXECUTE ─────────────────────────────────
+    if (moduleName === 'stock_adjustments') {
+      const groups: Record<string, any[]> = {};
+      for (const { data } of rows) {
+        const ref = String(data.adjustment_number || 'ADJ-DEFAULT').trim();
+        if (!groups[ref]) groups[ref] = [];
+        groups[ref].push(data);
+      }
+
+      let count = 0;
+      for (const [ref, lines] of Object.entries(groups)) {
+        const docId = uuidv4();
+        const firstLine = lines[0];
+        const dateStr = firstLine.date || new Date().toISOString().split('T')[0];
+        const adjNumber = await ensureUniqueSequenceNumber(client, companyId || '', 'stock_adjustments', dateStr, ref.startsWith('ADJ-DEFAULT') ? undefined : ref);
+        const description = firstLine.description || `إذن تسوية مخزنية رقم ${adjNumber}`;
+
+        await client.query(
+          `INSERT INTO "stock_adjustments" (
+            id, company_id, adjustment_number, date, account_id, account_name,
+            description, created_by, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)`,
+          [
+            docId, companyId, adjNumber, dateStr,
+            firstLine.account_id, firstLine.account_name || null,
+            description, req.user?.id || 'system'
+          ]
+        );
+
+        const journalLines: { account_id: string; debit: number; credit: number; description: string }[] = [];
+
+        for (const line of lines) {
+          const itemId = uuidv4();
+          const qty = Number(line.quantity) || 0;
+          const cost = Number(line.unit_cost) || 0;
+
+          const costInfo = await recordAdjustment(
+            client,
+            companyId || '',
+            line.warehouse_id || null,
+            line.product_id,
+            qty,
+            cost,
+            docId,
+            adjNumber,
+            dateStr
+          );
+
+          const totalCostValue = Math.abs(costInfo.totalCost || (qty * cost));
+          const lineTotal = qty < 0 ? -totalCostValue : totalCostValue;
+
+          await client.query(
+            `INSERT INTO "stock_adjustment_items" (
+              id, adjustment_id, product_id, product_name, product_code,
+              warehouse_id, warehouse_name, quantity, unit_cost, total_cost, company_id, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)`,
+            [
+              itemId, docId, line.product_id, line.product_name, line.product_code,
+              line.warehouse_id, line.warehouse_name, qty, cost, lineTotal, companyId
+            ]
+          );
+
+          const prodRes = await client.query('SELECT inventory_account_id FROM products WHERE id = $1', [line.product_id]);
+          const invAccountId = prodRes.rows[0]?.inventory_account_id;
+
+          if (invAccountId && totalCostValue > 0) {
+            if (qty > 0) {
+              journalLines.push({
+                account_id: invAccountId,
+                debit: totalCostValue,
+                credit: 0,
+                description: `تسوية إضافة مخزون صنف: ${line.product_name}`
+              });
+              journalLines.push({
+                account_id: firstLine.account_id,
+                debit: 0,
+                credit: totalCostValue,
+                description: `تسوية إضافة مخزون صنف: ${line.product_name}`
+              });
+            } else if (qty < 0) {
+              journalLines.push({
+                account_id: firstLine.account_id,
+                debit: totalCostValue,
+                credit: 0,
+                description: `تسوية صرف مخزون صنف: ${line.product_name}`
+              });
+              journalLines.push({
+                account_id: invAccountId,
+                debit: 0,
+                credit: totalCostValue,
+                description: `تسوية صرف مخزون صنف: ${line.product_name}`
+              });
+            }
+          }
+        }
+
+        if (journalLines.length > 0) {
+          const jeId = uuidv4();
+          const entryNumber = await ensureUniqueSequenceNumber(client, companyId || '', 'journal_entries', dateStr);
+          const totalDebit = Math.round(journalLines.reduce((s, l) => s + l.debit, 0) * 100) / 100;
+          const totalCredit = Math.round(journalLines.reduce((s, l) => s + l.credit, 0) * 100) / 100;
+
+          await client.query(
+            `INSERT INTO "journal_entries" (
+              id, company_id, entry_number, date, description,
+              reference_id, reference_type, reference_number,
+              total_debit, total_credit, status, created_by, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'posted', $11, CURRENT_TIMESTAMP)`,
+            [
+              jeId, companyId, entryNumber, dateStr, description,
+              docId, 'stock_adjustment', adjNumber,
+              totalDebit, totalCredit, req.user?.id || 'system'
+            ]
+          );
+
+          for (const jl of journalLines) {
+            await client.query(
+              `INSERT INTO "journal_entry_lines" (
+                id, journal_entry_id, company_id, account_id, debit, credit, description, created_at
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)`,
+              [
+                uuidv4(), jeId, companyId, jl.account_id,
+                Math.round(jl.debit * 100) / 100, Math.round(jl.credit * 100) / 100,
+                jl.description
+              ]
+            );
+          }
+        }
+
+        count++;
+      }
+
+      await client.query('COMMIT');
+      return res.json({ success: true, inserted: count, updated: 0, total: rows.length });
+    }
+
+    // ── RECEIPT VOUCHERS EXECUTE ──────────────────────────────────
+    if (moduleName === 'receipt_vouchers') {
+      let count = 0;
+      for (const { data } of rows) {
+        const docId = uuidv4();
+        const dateStr = data.date || new Date().toISOString().split('T')[0];
+        const vNum = await ensureUniqueSequenceNumber(client, companyId || '', 'receipt_vouchers', dateStr, data.voucher_number || undefined);
+        const amount = Math.round(Number(data.amount) * 100) / 100;
+        const desc = data.description || `سند قبض رقم ${vNum}`;
+
+        await client.query(
+          `INSERT INTO "receipt_vouchers" (
+            id, company_id, voucher_number, date, amount, description,
+            payment_method_id, payment_method_name, account_id,
+            customer_id, customer_name, supplier_id, supplier_name,
+            manual_reference, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)`,
+          [
+            docId, companyId, vNum, dateStr, amount, desc,
+            data.payment_method_id, data.payment_method_name, data.pm_account_id,
+            data.customer_id || null, data.customer_name || null,
+            data.supplier_id || null, data.supplier_name || null,
+            data.manual_reference || null
+          ]
+        );
+
+        const jeId = uuidv4();
+        const entryNumber = await ensureUniqueSequenceNumber(client, companyId || '', 'journal_entries', dateStr);
+
+        await client.query(
+          `INSERT INTO "journal_entries" (
+            id, company_id, entry_number, date, description,
+            reference_id, reference_type, reference_number,
+            total_debit, total_credit, status, created_by, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'posted', $11, CURRENT_TIMESTAMP)`,
+          [
+            jeId, companyId, entryNumber, dateStr, desc,
+            docId, 'receipt_voucher', vNum,
+            amount, amount, req.user?.id || 'system'
+          ]
+        );
+
+        await client.query(
+          `INSERT INTO "journal_entry_lines" (
+            id, journal_entry_id, company_id, account_id, account_name,
+            debit, credit, description, sub_account_id, sub_account_type, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8, 'payment_method', CURRENT_TIMESTAMP)`,
+          [
+            uuidv4(), jeId, companyId, data.pm_account_id, data.payment_method_name,
+            amount, `سند قبض رقم ${vNum} - ${data.payment_method_name}`,
+            data.payment_method_id
+          ]
+        );
+
+        const subId = data.customer_id || data.supplier_id || null;
+        const subType = data.customer_id ? 'customer' : (data.supplier_id ? 'supplier' : null);
+        await client.query(
+          `INSERT INTO "journal_entry_lines" (
+            id, journal_entry_id, company_id, account_id,
+            customer_id, customer_name, supplier_id, supplier_name,
+            debit, credit, description, sub_account_id, sub_account_type, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, $9, $10, $11, $12, CURRENT_TIMESTAMP)`,
+          [
+            uuidv4(), jeId, companyId, data.counter_account_id,
+            data.customer_id || null, data.customer_name || null,
+            data.supplier_id || null, data.supplier_name || null,
+            amount, `سند قبض رقم ${vNum} - ${data.description || data.customer_name || data.supplier_name || ''}`,
+            subId, subType
+          ]
+        );
+
+        count++;
+      }
+
+      await client.query('COMMIT');
+      return res.json({ success: true, inserted: count, updated: 0, total: rows.length });
+    }
+
+    // ── PAYMENT VOUCHERS EXECUTE ──────────────────────────────────
+    if (moduleName === 'payment_vouchers') {
+      let count = 0;
+      for (const { data } of rows) {
+        const docId = uuidv4();
+        const dateStr = data.date || new Date().toISOString().split('T')[0];
+        const vNum = await ensureUniqueSequenceNumber(client, companyId || '', 'payment_vouchers', dateStr, data.voucher_number || undefined);
+        const amount = Math.round(Number(data.amount) * 100) / 100;
+        const desc = data.description || `سند صرف رقم ${vNum}`;
+
+        await client.query(
+          `INSERT INTO "payment_vouchers" (
+            id, company_id, voucher_number, date, amount, description,
+            payment_method_id, payment_method_name, account_id,
+            supplier_id, supplier_name, expense_category_id, category_name,
+            customer_id, customer_name, paid_to_type, manual_reference, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, CURRENT_TIMESTAMP)`,
+          [
+            docId, companyId, vNum, dateStr, amount, desc,
+            data.payment_method_id, data.payment_method_name, data.pm_account_id,
+            data.supplier_id || null, data.supplier_name || null,
+            data.expense_category_id || null, data.category_name || null,
+            data.customer_id || null, data.customer_name || null,
+            data.paid_to_type || 'supplier', data.manual_reference || null
+          ]
+        );
+
+        const jeId = uuidv4();
+        const entryNumber = await ensureUniqueSequenceNumber(client, companyId || '', 'journal_entries', dateStr);
+
+        await client.query(
+          `INSERT INTO "journal_entries" (
+            id, company_id, entry_number, date, description,
+            reference_id, reference_type, reference_number,
+            total_debit, total_credit, status, created_by, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'posted', $11, CURRENT_TIMESTAMP)`,
+          [
+            jeId, companyId, entryNumber, dateStr, desc,
+            docId, 'payment_voucher', vNum,
+            amount, amount, req.user?.id || 'system'
+          ]
+        );
+
+        const subId = data.supplier_id || data.customer_id || null;
+        const subType = data.supplier_id ? 'supplier' : (data.customer_id ? 'customer' : null);
+        await client.query(
+          `INSERT INTO "journal_entry_lines" (
+            id, journal_entry_id, company_id, account_id,
+            supplier_id, supplier_name, customer_id, customer_name,
+            debit, credit, description, sub_account_id, sub_account_type, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, $10, $11, $12, CURRENT_TIMESTAMP)`,
+          [
+            uuidv4(), jeId, companyId, data.counter_account_id,
+            data.supplier_id || null, data.supplier_name || null,
+            data.customer_id || null, data.customer_name || null,
+            amount, `سند صرف رقم ${vNum} - ${data.description || data.supplier_name || data.category_name || data.customer_name || ''}`,
+            subId, subType
+          ]
+        );
+
+        await client.query(
+          `INSERT INTO "journal_entry_lines" (
+            id, journal_entry_id, company_id, account_id, account_name,
+            debit, credit, description, sub_account_id, sub_account_type, created_at
+          ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, 'payment_method', CURRENT_TIMESTAMP)`,
+          [
+            uuidv4(), jeId, companyId, data.pm_account_id, data.payment_method_name,
+            amount, `سند صرف رقم ${vNum} - ${data.payment_method_name}`,
+            data.payment_method_id
+          ]
+        );
+
+        count++;
+      }
+
+      await client.query('COMMIT');
+      return res.json({ success: true, inserted: count, updated: 0, total: rows.length });
+    }
+
+    // ── CASH TRANSFERS EXECUTE ────────────────────────────────────
+    if (moduleName === 'cash_transfers') {
+      let count = 0;
+      for (const { data } of rows) {
+        const docId = uuidv4();
+        const dateStr = data.date || new Date().toISOString().split('T')[0];
+        const tNum = await ensureUniqueSequenceNumber(client, companyId || '', 'cash_transfers', dateStr, data.transfer_number || undefined);
+        const amount = Math.round(Number(data.amount) * 100) / 100;
+        const desc = data.description || `تحويل نقدية رقم ${tNum} من ${data.from_payment_method_name} إلى ${data.to_payment_method_name}`;
+
+        await client.query(
+          `INSERT INTO "cash_transfers" (
+            id, company_id, transfer_number, date, amount,
+            from_payment_method_id, to_payment_method_id,
+            from_payment_method_name, to_payment_method_name,
+            description, created_by, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)`,
+          [
+            docId, companyId, tNum, dateStr, amount,
+            data.from_payment_method_id, data.to_payment_method_id,
+            data.from_payment_method_name, data.to_payment_method_name,
+            desc, req.user?.id || 'system'
+          ]
+        );
+
+        const jeId = uuidv4();
+        const entryNumber = await ensureUniqueSequenceNumber(client, companyId || '', 'journal_entries', dateStr);
+
+        await client.query(
+          `INSERT INTO "journal_entries" (
+            id, company_id, entry_number, date, description,
+            reference_id, reference_type, reference_number,
+            total_debit, total_credit, status, created_by, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'posted', $11, CURRENT_TIMESTAMP)`,
+          [
+            jeId, companyId, entryNumber, dateStr, desc,
+            docId, 'transfer', tNum,
+            amount, amount, req.user?.id || 'system'
+          ]
+        );
+
+        await client.query(
+          `INSERT INTO "journal_entry_lines" (
+            id, journal_entry_id, company_id, account_id, account_name,
+            debit, credit, description, sub_account_id, sub_account_type, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8, 'payment_method', CURRENT_TIMESTAMP)`,
+          [
+            uuidv4(), jeId, companyId, data.to_account_id, data.to_payment_method_name,
+            amount, `تحويل وارد إلى ${data.to_payment_method_name} - سند رقم ${tNum}`,
+            data.to_payment_method_id
+          ]
+        );
+
+        await client.query(
+          `INSERT INTO "journal_entry_lines" (
+            id, journal_entry_id, company_id, account_id, account_name,
+            debit, credit, description, sub_account_id, sub_account_type, created_at
+          ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, 'payment_method', CURRENT_TIMESTAMP)`,
+          [
+            uuidv4(), jeId, companyId, data.from_account_id, data.from_payment_method_name,
+            amount, `تحويل صادر من ${data.from_payment_method_name} - سند رقم ${tNum}`,
+            data.from_payment_method_id
+          ]
+        );
+
+        count++;
+      }
+
+      await client.query('COMMIT');
+      return res.json({ success: true, inserted: count, updated: 0, total: rows.length });
+    }
+
+    // ── CUSTOMER DISCOUNTS EXECUTE ────────────────────────────────
+    if (moduleName === 'customer_discounts') {
+      let count = 0;
+      for (const { data } of rows) {
+        const docId = uuidv4();
+        const dateStr = data.date || new Date().toISOString().split('T')[0];
+        const dNum = await ensureUniqueSequenceNumber(client, companyId || '', 'customer_discounts', dateStr, data.number || undefined);
+        const amount = Math.round(Number(data.amount) * 100) / 100;
+        const desc = data.description || `خصم مسموح به إشعار رقم ${dNum} للعميل ${data.customer_name}`;
+
+        await client.query(
+          `INSERT INTO "customer_discounts" (
+            id, company_id, number, date, customer_id, customer_name,
+            account_id, account_name, amount, description, notes, created_by, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP)`,
+          [
+            docId, companyId, dNum, dateStr, data.customer_id, data.customer_name,
+            data.account_id, data.account_name, amount, desc, data.notes || null,
+            req.user?.id || 'system'
+          ]
+        );
+
+        const jeId = uuidv4();
+        const entryNumber = await ensureUniqueSequenceNumber(client, companyId || '', 'journal_entries', dateStr);
+
+        await client.query(
+          `INSERT INTO "journal_entries" (
+            id, company_id, entry_number, date, description,
+            reference_id, reference_type, reference_number,
+            total_debit, total_credit, status, created_by, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'posted', $11, CURRENT_TIMESTAMP)`,
+          [
+            jeId, companyId, entryNumber, dateStr, desc,
+            docId, 'customer_discount', dNum,
+            amount, amount, req.user?.id || 'system'
+          ]
+        );
+
+        await client.query(
+          `INSERT INTO "journal_entry_lines" (
+            id, journal_entry_id, company_id, account_id, account_name,
+            debit, credit, description, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, 0, $7, CURRENT_TIMESTAMP)`,
+          [
+            uuidv4(), jeId, companyId, data.account_id, data.account_name || 'حساب الخصم المسموح به',
+            amount, `خصم مسموح به - إشعار رقم ${dNum} - ${data.customer_name}`
+          ]
+        );
+
+        await client.query(
+          `INSERT INTO "journal_entry_lines" (
+            id, journal_entry_id, company_id, account_id,
+            customer_id, customer_name, debit, credit, description,
+            sub_account_id, sub_account_type, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8, $9, 'customer', CURRENT_TIMESTAMP)`,
+          [
+            uuidv4(), jeId, companyId, data.counter_account_id,
+            data.customer_id, data.customer_name,
+            amount, `خصم مسموح به - إشعار رقم ${dNum} - ${data.customer_name}`,
+            data.customer_id
+          ]
+        );
+
+        count++;
+      }
+
+      await client.query('COMMIT');
+      return res.json({ success: true, inserted: count, updated: 0, total: rows.length });
+    }
+
+    // ── SUPPLIER DISCOUNTS EXECUTE ────────────────────────────────
+    if (moduleName === 'supplier_discounts') {
+      let count = 0;
+      for (const { data } of rows) {
+        const docId = uuidv4();
+        const dateStr = data.date || new Date().toISOString().split('T')[0];
+        const dNum = await ensureUniqueSequenceNumber(client, companyId || '', 'supplier_discounts', dateStr, data.number || undefined);
+        const amount = Math.round(Number(data.amount) * 100) / 100;
+        const desc = data.description || `خصم مكتسب إشعار رقم ${dNum} من المورد ${data.supplier_name}`;
+
+        await client.query(
+          `INSERT INTO "supplier_discounts" (
+            id, company_id, number, date, supplier_id, supplier_name,
+            account_id, account_name, amount, description, notes, created_by, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP)`,
+          [
+            docId, companyId, dNum, dateStr, data.supplier_id, data.supplier_name,
+            data.account_id, data.account_name, amount, desc, data.notes || null,
+            req.user?.id || 'system'
+          ]
+        );
+
+        const jeId = uuidv4();
+        const entryNumber = await ensureUniqueSequenceNumber(client, companyId || '', 'journal_entries', dateStr);
+
+        await client.query(
+          `INSERT INTO "journal_entries" (
+            id, company_id, entry_number, date, description,
+            reference_id, reference_type, reference_number,
+            total_debit, total_credit, status, created_by, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'posted', $11, CURRENT_TIMESTAMP)`,
+          [
+            jeId, companyId, entryNumber, dateStr, desc,
+            docId, 'supplier_discount', dNum,
+            amount, amount, req.user?.id || 'system'
+          ]
+        );
+
+        await client.query(
+          `INSERT INTO "journal_entry_lines" (
+            id, journal_entry_id, company_id, account_id,
+            supplier_id, supplier_name, debit, credit, description,
+            sub_account_id, sub_account_type, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, 'supplier', CURRENT_TIMESTAMP)`,
+          [
+            uuidv4(), jeId, companyId, data.counter_account_id,
+            data.supplier_id, data.supplier_name,
+            amount, `خصم مكتسب - إشعار رقم ${dNum} - ${data.supplier_name}`,
+            data.supplier_id
+          ]
+        );
+
+        await client.query(
+          `INSERT INTO "journal_entry_lines" (
+            id, journal_entry_id, company_id, account_id, account_name,
+            debit, credit, description, created_at
+          ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, CURRENT_TIMESTAMP)`,
+          [
+            uuidv4(), jeId, companyId, data.account_id, data.account_name || 'حساب الخصم المكتسب',
+            amount, `خصم مكتسب - إشعار رقم ${dNum} - ${data.supplier_name}`
+          ]
+        );
+
+        count++;
+      }
+
+      await client.query('COMMIT');
+      return res.json({ success: true, inserted: count, updated: 0, total: rows.length });
     }
 
     // ── STANDARD MODULES EXECUTE ─────────────────────────────────

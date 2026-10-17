@@ -21,6 +21,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { ExportButtons } from '../components/ExportButtons';
+import { ExcelImportWizard } from '../components/ExcelImportWizard';
 
 
 interface ItemInput {
@@ -38,6 +39,7 @@ export const OpeningStockBalances: React.FC = () => {
 
   // Data states
   const [documents, setDocuments] = useState<OpeningStockBalance[]>([]);
+  const [showImportWizard, setShowImportWizard] = useState(false);
   const [reversingDoc, setReversingDoc] = useState<OpeningStockBalance | null>(null);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -1148,11 +1150,12 @@ export const OpeningStockBalances: React.FC = () => {
               </button>
               
               <button
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-1 px-2.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg text-slate-700 font-bold text-xs transition-all"
+                onClick={() => setShowImportWizard(true)}
+                className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white text-emerald-700 border border-emerald-300 rounded-lg font-bold text-xs hover:bg-emerald-50 transition-all active:scale-95 shadow-xs"
+                title="استيراد من Excel"
               >
-                <Upload size={13} className="text-slate-500" />
-                <span>{language === 'ar' ? 'استيراد من إكسيل' : 'Import Excel'}</span>
+                <FileSpreadsheet size={15} />
+                <span className="hidden md:inline">استيراد Excel</span>
               </button>
 
               <ExportButtons
@@ -1539,6 +1542,19 @@ export const OpeningStockBalances: React.FC = () => {
           entityName={reversingDoc.description || 'رصيد افتتاحي'}
           entityType="general"
           moduleTitleAr="رصيد مخزون افتتاحي"
+        />
+      )}
+
+      {showImportWizard && (
+        <ExcelImportWizard
+          module="opening_stock_balances"
+          moduleNameAr="أرصدة المخزون الافتتاحية"
+          onClose={() => setShowImportWizard(false)}
+          onSuccess={() => {
+            setShowImportWizard(false);
+            dbService.notify('opening_stock_balances');
+            window.dispatchEvent(new Event('db-change'));
+          }}
         />
       )}
     </div>

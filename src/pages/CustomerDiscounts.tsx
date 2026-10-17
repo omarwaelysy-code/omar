@@ -16,6 +16,7 @@ import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils'
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { PaginationControls } from '../components/PaginationControls';
 import { ExportButtons } from '../components/ExportButtons';
+import { ExcelImportWizard } from '../components/ExcelImportWizard';
 import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
 import { ReversalModal } from '../components/common/ReversalModal';
 import { ReversalBanner } from '../components/common/ReversalBanner';
@@ -26,6 +27,7 @@ export const CustomerDiscounts: React.FC = () => {
   const { showNotification } = useNotification();
   const { t, dir, language } = useLanguage();
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [showImportWizard, setShowImportWizard] = useState(false);
   const [reversingDiscount, setReversingDiscount] = useState<any | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -794,6 +796,14 @@ export const CustomerDiscounts: React.FC = () => {
               >
                 <Plus size={14} />
                 <span>{t('discounts.add_customer')}</span>
+              </button>
+              <button
+                onClick={() => setShowImportWizard(true)}
+                className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-white text-emerald-700 border border-emerald-300 rounded-xl font-bold text-xs hover:bg-emerald-50 transition-all active:scale-95 shadow-xs"
+                title="استيراد من Excel"
+              >
+                <FileSpreadsheet size={14} />
+                <span className="hidden md:inline">استيراد Excel</span>
               </button>
               <ExportButtons 
                 size="sm"
@@ -1984,6 +1994,19 @@ export const CustomerDiscounts: React.FC = () => {
           entityName={reversingDiscount.customer_name}
           entityType="customer"
           moduleTitleAr="خصم عميل"
+        />
+      )}
+
+      {showImportWizard && (
+        <ExcelImportWizard
+          module="customer_discounts"
+          moduleNameAr="خصومات العملاء (المسموح به)"
+          onClose={() => setShowImportWizard(false)}
+          onSuccess={() => {
+            setShowImportWizard(false);
+            dbService.notify('customer_discounts');
+            window.dispatchEvent(new Event('db-change'));
+          }}
         />
       )}
     </div>

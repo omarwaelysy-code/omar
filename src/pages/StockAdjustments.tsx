@@ -17,6 +17,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { ExportButtons } from '../components/ExportButtons';
+import { ExcelImportWizard } from '../components/ExcelImportWizard';
 import { useRef } from 'react';
 
 
@@ -35,6 +36,7 @@ export const StockAdjustments: React.FC = () => {
 
   // Data states
   const [adjustments, setAdjustments] = useState<StockAdjustment[]>([]);
+  const [showImportWizard, setShowImportWizard] = useState(false);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -896,6 +898,14 @@ export const StockAdjustments: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setShowImportWizard(true)}
+                className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white text-emerald-700 border border-emerald-300 rounded-lg font-bold text-xs hover:bg-emerald-50 transition-all active:scale-95 shadow-xs"
+                title="استيراد من Excel"
+              >
+                <FileSpreadsheet size={15} />
+                <span className="hidden md:inline">استيراد Excel</span>
+              </button>
               <ExportButtons
                 onExportExcel={() => handleExportExcel(adjustments)}
                 onExportPDF={handleExportPDF}
@@ -1228,6 +1238,19 @@ export const StockAdjustments: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {showImportWizard && (
+        <ExcelImportWizard
+          module="stock_adjustments"
+          moduleNameAr="تسويات المخزون"
+          onClose={() => setShowImportWizard(false)}
+          onSuccess={() => {
+            setShowImportWizard(false);
+            dbService.notify('stock_adjustments');
+            window.dispatchEvent(new Event('db-change'));
+          }}
+        />
+      )}
     </div>
   );
 };
