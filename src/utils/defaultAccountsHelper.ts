@@ -124,6 +124,18 @@ export const DEFAULT_KEY_SPECS: Record<string, DefaultAccountConfigItem> = {
     defaultCode: '3103',
     usages: ['retained_earnings', 'equity'],
     codePrefixes: ['3103', '31']
+  },
+  realized_forex_gain: {
+    key: 'realized_forex_gain',
+    defaultCode: '420201',
+    usages: ['realized_forex_gain', 'forex_gain'],
+    codePrefixes: ['420201', '4202', '42']
+  },
+  realized_forex_loss: {
+    key: 'realized_forex_loss',
+    defaultCode: '630201',
+    usages: ['realized_forex_loss', 'forex_loss'],
+    codePrefixes: ['630201', '6302', '63']
   }
 };
 

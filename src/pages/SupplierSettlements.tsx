@@ -14,7 +14,7 @@ import { ExportButtons } from '../components/ExportButtons';
 import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
 import { SearchableSelect } from '../components/common/SearchableSelect';
 import { useRef } from 'react';
-
+import { useDefaultAccounts, getDefaultAccount } from '../utils/defaultAccountsHelper';
 
 interface Movement {
   id: string; // unique composite key (e.g. "INV_ID" or "VOU_ID-itemIdx")
@@ -32,6 +32,8 @@ interface Movement {
   currency?: string;
   exchange_rate?: number;
   foreign_amount?: number | null;
+  foreign_open_amount?: number;
+  foreign_settled_amount?: number;
 }
 
 export const SupplierSettlements: React.FC = () => {
@@ -39,6 +41,8 @@ export const SupplierSettlements: React.FC = () => {
   const { showNotification } = useNotification();
   const { t, dir, language } = useLanguage();
   const { setCurrentPage, setPendingViewDoc, pendingViewDoc } = useNavigation();
+  const { defaultAccounts: defaultAccountMap } = useDefaultAccounts();
+  const [previewJeNumber, setPreviewJeNumber] = useState<string>('');
 
   // Database states
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -133,6 +137,14 @@ export const SupplierSettlements: React.FC = () => {
       };
     }
   }, [user]);
+
+  useEffect(() => {
+    if (user && settlementDate) {
+      dbService.getNextSequence('journal_entries', settlementDate)
+        .then(setPreviewJeNumber)
+        .catch(() => {});
+    }
+  }, [user, settlementDate]);
 
   const systemCurrency = useMemo(() => {
     return company?.settings?.currency || (company as any)?.currency || 'EGP';
@@ -626,6 +638,9 @@ export const SupplierSettlements: React.FC = () => {
 
             const originalAmount = baseAmount;
             const openAmount = originalAmount - totalSettled;
+            const foreignOpenAmount = isForeign
+              ? (vRate > 0 ? Number((openAmount / vRate).toFixed(2)) : foreignAmount)
+              : undefined;
 
             const editMatch = currentEditingSettlement?.debitDocs?.find((d: any) => d.original_id === v.id || d.number === (v.voucher_number || v.number));
 
@@ -640,6 +655,8 @@ export const SupplierSettlements: React.FC = () => {
                 original_amount: originalAmount,
                 open_amount: openAmount,
                 settled_amount: editMatch ? editMatch.amount : 0,
+                foreign_open_amount: foreignOpenAmount,
+                foreign_settled_amount: 0,
                 notes: v.description || v.notes || '',
                 je_number: v.entry_number || '',
                 selected: !!editMatch,
@@ -674,6 +691,9 @@ export const SupplierSettlements: React.FC = () => {
         const settled = getSettlementsForTarget(r.id);
         const originalAmount = baseAmount;
         const openAmount = originalAmount - settled;
+        const foreignOpenAmount = isForeign
+          ? (retRate > 0 ? Number((openAmount / retRate).toFixed(2)) : foreignAmount)
+          : undefined;
 
         const editMatch = currentEditingSettlement?.debitDocs?.find((d: any) => d.original_id === r.id || d.number === r.return_number);
 
@@ -688,6 +708,8 @@ export const SupplierSettlements: React.FC = () => {
             original_amount: originalAmount,
             open_amount: openAmount,
             settled_amount: editMatch ? editMatch.amount : 0,
+            foreign_open_amount: foreignOpenAmount,
+            foreign_settled_amount: 0,
             notes: r.description || r.notes || '',
             je_number: r.entry_number || '',
             selected: !!editMatch,
@@ -721,6 +743,9 @@ export const SupplierSettlements: React.FC = () => {
           const originalAmount = Number(item.debit) || 0;
           const settled = getSettlementsForTarget(`${je.id}-${idx}`, je.reference_type);
           const openAmount = originalAmount - settled;
+          const foreignOpenAmount = isForeign
+            ? (jeRate > 0 ? Number((openAmount / jeRate).toFixed(2)) : foreignAmount)
+            : undefined;
 
           const editMatch = currentEditingSettlement?.debitDocs?.find((d: any) => d.original_id === je.id || d.number === (je.entry_number || je.id.slice(0, 8)));
 
@@ -737,6 +762,8 @@ export const SupplierSettlements: React.FC = () => {
               original_amount: originalAmount,
               open_amount: openAmount,
               settled_amount: editMatch ? editMatch.amount : 0,
+              foreign_open_amount: foreignOpenAmount,
+              foreign_settled_amount: 0,
               notes: item.description || je.description || '',
               je_number: je.entry_number || je.id.slice(0, 8),
               selected: !!editMatch,
@@ -776,6 +803,9 @@ export const SupplierSettlements: React.FC = () => {
           .reduce((sum, s) => sum + s.amount, 0);
         const originalAmount = baseAmount;
         const openAmount = originalAmount - settledAmount;
+        const foreignOpenAmount = isForeign
+          ? (docRate > 0 ? Number((openAmount / docRate).toFixed(2)) : foreignAmount)
+          : undefined;
 
         const editMatch = currentEditingSettlement?.creditDocs?.find((c: any) => c.original_id === inv.id || c.number === inv.invoice_number);
 
@@ -790,6 +820,8 @@ export const SupplierSettlements: React.FC = () => {
             original_amount: originalAmount,
             open_amount: openAmount,
             settled_amount: editMatch ? editMatch.amount : 0,
+            foreign_open_amount: foreignOpenAmount,
+            foreign_settled_amount: 0,
             notes: inv.description || inv.notes || '',
             selected: !!editMatch,
             currency: docCurrency,
@@ -820,6 +852,9 @@ export const SupplierSettlements: React.FC = () => {
           const originalAmount = Number(item.credit) || 0;
           const settled = getSettlementsForTarget(`${je.id}-${idx}`, je.reference_type);
           const openAmount = originalAmount - settled;
+          const foreignOpenAmount = isForeign
+            ? (jeRate > 0 ? Number((openAmount / jeRate).toFixed(2)) : foreignAmount)
+            : undefined;
 
           const editMatch = currentEditingSettlement?.creditDocs?.find((c: any) => c.original_id === je.id || c.number === (je.entry_number || je.id.slice(0, 8)));
 
@@ -836,6 +871,8 @@ export const SupplierSettlements: React.FC = () => {
               original_amount: originalAmount,
               open_amount: openAmount,
               settled_amount: editMatch ? editMatch.amount : 0,
+              foreign_open_amount: foreignOpenAmount,
+              foreign_settled_amount: 0,
               notes: item.description || je.description || '',
               je_number: je.entry_number || je.id.slice(0, 8),
               selected: !!editMatch,
@@ -1013,7 +1050,12 @@ export const SupplierSettlements: React.FC = () => {
     const visibleIds = new Set(processedDebitMovements.map(m => m.id));
     setDebitMovements(prev => prev.map(m => {
       if (visibleIds.has(m.id)) {
-        return { ...m, selected: checked, settled_amount: checked ? m.open_amount : 0 };
+        return { 
+          ...m, 
+          selected: checked, 
+          settled_amount: checked ? m.open_amount : 0,
+          foreign_settled_amount: checked ? (m.foreign_open_amount || 0) : 0
+        };
       }
       return m;
     }));
@@ -1027,7 +1069,12 @@ export const SupplierSettlements: React.FC = () => {
     const visibleIds = new Set(processedCreditMovements.map(m => m.id));
     setCreditMovements(prev => prev.map(m => {
       if (visibleIds.has(m.id)) {
-        return { ...m, selected: checked, settled_amount: checked ? m.open_amount : 0 };
+        return { 
+          ...m, 
+          selected: checked, 
+          settled_amount: checked ? m.open_amount : 0,
+          foreign_settled_amount: checked ? (m.foreign_open_amount || 0) : 0
+        };
       }
       return m;
     }));
@@ -1043,14 +1090,24 @@ export const SupplierSettlements: React.FC = () => {
 
     setDebitMovements(prev => prev.map(m => {
       if (visibleDebitIds.has(m.id)) {
-        return { ...m, selected: checked, settled_amount: checked ? m.open_amount : 0 };
+        return { 
+          ...m, 
+          selected: checked, 
+          settled_amount: checked ? m.open_amount : 0,
+          foreign_settled_amount: checked ? (m.foreign_open_amount || 0) : 0
+        };
       }
       return m;
     }));
 
     setCreditMovements(prev => prev.map(m => {
       if (visibleCreditIds.has(m.id)) {
-        return { ...m, selected: checked, settled_amount: checked ? m.open_amount : 0 };
+        return { 
+          ...m, 
+          selected: checked, 
+          settled_amount: checked ? m.open_amount : 0,
+          foreign_settled_amount: checked ? (m.foreign_open_amount || 0) : 0
+        };
       }
       return m;
     }));
@@ -1060,7 +1117,12 @@ export const SupplierSettlements: React.FC = () => {
   const handleToggleDebit = (id: string, checked: boolean) => {
     setDebitMovements(prev => prev.map(m => {
       if (m.id === id) {
-        return { ...m, selected: checked, settled_amount: checked ? m.open_amount : 0 };
+        return { 
+          ...m, 
+          selected: checked, 
+          settled_amount: checked ? m.open_amount : 0,
+          foreign_settled_amount: checked ? (m.foreign_open_amount || 0) : 0
+        };
       }
       return m;
     }));
@@ -1069,7 +1131,12 @@ export const SupplierSettlements: React.FC = () => {
   const handleToggleCredit = (id: string, checked: boolean) => {
     setCreditMovements(prev => prev.map(m => {
       if (m.id === id) {
-        return { ...m, selected: checked, settled_amount: checked ? m.open_amount : 0 };
+        return { 
+          ...m, 
+          selected: checked, 
+          settled_amount: checked ? m.open_amount : 0,
+          foreign_settled_amount: checked ? (m.foreign_open_amount || 0) : 0
+        };
       }
       return m;
     }));
@@ -1079,7 +1146,15 @@ export const SupplierSettlements: React.FC = () => {
     setDebitMovements(prev => prev.map(m => {
       if (m.id === id) {
         const val = Math.max(0, Math.min(m.open_amount, amount));
-        return { ...m, settled_amount: val, selected: val > 0 };
+        const fxVal = m.currency && m.currency !== systemCurrency && m.exchange_rate
+          ? Number((val / m.exchange_rate).toFixed(2))
+          : 0;
+        return { 
+          ...m, 
+          settled_amount: val, 
+          foreign_settled_amount: fxVal, 
+          selected: val > 0 
+        };
       }
       return m;
     }));
@@ -1089,11 +1164,135 @@ export const SupplierSettlements: React.FC = () => {
     setCreditMovements(prev => prev.map(m => {
       if (m.id === id) {
         const val = Math.max(0, Math.min(m.open_amount, amount));
-        return { ...m, settled_amount: val, selected: val > 0 };
+        const fxVal = m.currency && m.currency !== systemCurrency && m.exchange_rate
+          ? Number((val / m.exchange_rate).toFixed(2))
+          : 0;
+        return { 
+          ...m, 
+          settled_amount: val, 
+          foreign_settled_amount: fxVal, 
+          selected: val > 0 
+        };
       }
       return m;
     }));
   };
+
+  const handleDebitForeignAmountChange = (id: string, foreignAmount: number) => {
+    setDebitMovements(prev => prev.map(m => {
+      if (m.id === id) {
+        const rate = m.exchange_rate || 1;
+        const newSettled = rate ? Number((foreignAmount * rate).toFixed(2)) : 0;
+        const clampedSettled = Math.max(0, Math.min(m.open_amount, newSettled));
+        return {
+          ...m,
+          foreign_settled_amount: foreignAmount,
+          settled_amount: clampedSettled,
+          selected: foreignAmount > 0
+        };
+      }
+      return m;
+    }));
+  };
+
+  const handleCreditForeignAmountChange = (id: string, foreignAmount: number) => {
+    setCreditMovements(prev => prev.map(m => {
+      if (m.id === id) {
+        const rate = m.exchange_rate || 1;
+        const newSettled = rate ? Number((foreignAmount * rate).toFixed(2)) : 0;
+        const clampedSettled = Math.max(0, Math.min(m.open_amount, newSettled));
+        return {
+          ...m,
+          foreign_settled_amount: foreignAmount,
+          settled_amount: clampedSettled,
+          selected: foreignAmount > 0
+        };
+      }
+      return m;
+    }));
+  };
+
+  // Realized Forex calculation
+  const forexCalculation = useMemo(() => {
+    const debits = debitMovements
+      .filter(m => m.selected && ((m.foreign_settled_amount || 0) > 0 || m.settled_amount > 0))
+      .map(m => ({
+        ...m,
+        remFx: m.foreign_settled_amount || 0,
+        remEgp: m.settled_amount || 0,
+        rate: m.exchange_rate || 1
+      }));
+
+    const credits = creditMovements
+      .filter(m => m.selected && ((m.foreign_settled_amount || 0) > 0 || m.settled_amount > 0))
+      .map(m => ({
+        ...m,
+        remFx: m.foreign_settled_amount || 0,
+        remEgp: m.settled_amount || 0,
+        rate: m.exchange_rate || 1
+      }));
+
+    let totalGainLoss = 0;
+    let totalMatchedFx = 0;
+    let primaryCurr = '';
+
+    let dIdx = 0;
+    let cIdx = 0;
+
+    while (dIdx < debits.length && cIdx < credits.length) {
+      const d = debits[dIdx];
+      const c = credits[cIdx];
+
+      const isSameForeign = Boolean(
+        d.currency && c.currency &&
+        d.currency === c.currency &&
+        d.currency !== systemCurrency
+      );
+
+      if (isSameForeign && d.remFx > 0.0001 && c.remFx > 0.0001) {
+        const matchFx = Math.min(d.remFx, c.remFx);
+        primaryCurr = d.currency || 'USD';
+        totalMatchedFx += matchFx;
+
+        // In Supplier Settlements:
+        // Credit is Purchase Invoice (rate c.rate).
+        // Debit is Payment Voucher (rate d.rate).
+        // Gain if invoice rate > payment rate (c.rate > d.rate).
+        const diffPerUnit = c.rate - d.rate;
+        const gainLoss = Number((matchFx * diffPerUnit).toFixed(2));
+        totalGainLoss += gainLoss;
+
+        d.remFx -= matchFx;
+        c.remFx -= matchFx;
+      }
+
+      const dDone = isSameForeign ? d.remFx <= 0.001 : true;
+      const cDone = isSameForeign ? c.remFx <= 0.001 : true;
+
+      if (dDone) dIdx++;
+      if (cDone) cIdx++;
+
+      if (!isSameForeign) {
+        dIdx++;
+        cIdx++;
+      }
+    }
+
+    const roundedGainLoss = Number(totalGainLoss.toFixed(2));
+    const hasForex = Math.abs(roundedGainLoss) >= 0.01;
+    const isGain = roundedGainLoss > 0;
+    const targetKey = isGain ? 'realized_forex_gain' : 'realized_forex_loss';
+    const account = hasForex ? (getDefaultAccount(targetKey, defaultAccountMap, accounts) || accounts.find(a => a.code === (isGain ? '420201' : '630201'))) : undefined;
+
+    return {
+      hasForex,
+      netGainLoss: roundedGainLoss,
+      matchedForeignAmount: Number(totalMatchedFx.toFixed(2)),
+      currency: primaryCurr,
+      account,
+      isGain
+    };
+  }, [debitMovements, creditMovements, systemCurrency, defaultAccountMap, accounts]);
 
   // Toggle layout mode
   const handleToggleLayout = () => {
@@ -1178,7 +1377,10 @@ export const SupplierSettlements: React.FC = () => {
       showNotification(language === 'ar' ? 'المبلغ المسوى يجب أن يكون أكبر من الصفر' : 'Settled amount must be greater than zero', 'error');
       return;
     }
-    if (Math.abs(totalSettledDebit - totalSettledCredit) > 0.01) {
+    const diff = Math.abs(totalSettledDebit - totalSettledCredit);
+    const isForexBalanced = forexCalculation.hasForex && Math.abs(diff - Math.abs(forexCalculation.netGainLoss)) <= 0.05;
+
+    if (diff > 0.05 && !isForexBalanced) {
       showNotification(language === 'ar' ? 'الحركات غير متوازنة، يرجى ضبط الفروقات قبل الحفظ' : 'Movements are unbalanced, please adjust differences before saving', 'error');
       return;
     }
@@ -1329,6 +1531,81 @@ export const SupplierSettlements: React.FC = () => {
         await dbService.update('payment_vouchers', id, v);
       }
 
+      // Record Forex Realized Gain/Loss Journal Entry if exists
+      if (forexCalculation.hasForex && Math.abs(forexCalculation.netGainLoss) >= 0.01) {
+        try {
+          const isGain = forexCalculation.isGain;
+          const absAmount = Math.abs(forexCalculation.netGainLoss);
+          const sup = suppliers.find(s => s.id === selectedSupplierId);
+          const entityAcc = accounts.find(a => a.id === sup?.account_id) || 
+                            getDefaultAccount('supplier', defaultAccountMap, accounts);
+          const targetKey = isGain ? 'realized_forex_gain' : 'realized_forex_loss';
+          const forexAcc = forexCalculation.account || 
+                           getDefaultAccount(targetKey, defaultAccountMap, accounts) ||
+                           accounts.find(a => a.code === (isGain ? '420201' : '630201'));
+
+          if (entityAcc && forexAcc) {
+            const jeNumber = await dbService.getNextSequence('journal_entries', settlementDate);
+            const jeItems = isGain ? [
+              {
+                account_id: entityAcc.id,
+                account_name: entityAcc.name,
+                debit: absAmount,
+                credit: 0,
+                description: `أرباح فروق عملة محققة - تسوية مورد: ${sup?.name} - تسوية رقم: ${settlementNumber}`,
+                supplier_id: selectedSupplierId,
+                supplier_name: sup?.name
+              },
+              {
+                account_id: forexAcc.id,
+                account_name: forexAcc.name,
+                debit: 0,
+                credit: absAmount,
+                description: `أرباح فروق عملة محققة - تسوية مورد: ${sup?.name} - تسوية رقم: ${settlementNumber}`,
+                supplier_id: selectedSupplierId,
+                supplier_name: sup?.name
+              }
+            ] : [
+              {
+                account_id: forexAcc.id,
+                account_name: forexAcc.name,
+                debit: absAmount,
+                credit: 0,
+                description: `خسائر فروق عملة محققة - تسوية مورد: ${sup?.name} - تسوية رقم: ${settlementNumber}`,
+                supplier_id: selectedSupplierId,
+                supplier_name: sup?.name
+              },
+              {
+                account_id: entityAcc.id,
+                account_name: entityAcc.name,
+                debit: 0,
+                credit: absAmount,
+                description: `خسائر فروق عملة محققة - تسوية مورد: ${sup?.name} - تسوية رقم: ${settlementNumber}`,
+                supplier_id: selectedSupplierId,
+                supplier_name: sup?.name
+              }
+            ];
+
+            await dbService.add('journal_entries', {
+              company_id: user.company_id,
+              date: settlementDate,
+              entry_number: jeNumber,
+              description: `قيد فروق عملة محققة ناتجة عن تسوية أرصدة مورد رقم: ${settlementNumber} - ${sup?.name}`,
+              reference_id: settlementNumber,
+              reference_type: 'supplier_settlement_forex',
+              reference_number: settlementNumber,
+              items: jeItems,
+              total_debit: absAmount,
+              total_credit: absAmount,
+              created_at: new Date().toISOString(),
+              created_by: user.id
+            });
+          }
+        } catch (jeErr) {
+          console.error('Failed to create forex journal entry for supplier:', jeErr);
+        }
+      }
+
       showNotification(language === 'ar' ? 'تم حفظ التسوية بنجاح وتوزيع الأرصدة' : 'Settlement saved and balances distributed successfully', 'success');
       setAttachments([]);
 
@@ -1440,6 +1717,20 @@ export const SupplierSettlements: React.FC = () => {
           if (changed) {
             await dbService.update('payment_vouchers', v.id, { ...v, items: updatedItems });
           }
+        }
+      }
+
+      // 3. Delete Forex Journal Entry if created
+      const relatedJes = allJournalEntries.filter((je: any) =>
+        je.reference_id === settlementNumber ||
+        je.reference_number === settlementNumber ||
+        (je.reference_type === 'supplier_settlement_forex' && (je.description?.includes(settlementNumber) || je.reference_id === settlementNumber))
+      );
+      for (const je of relatedJes) {
+        try {
+          await dbService.delete('journal_entries', je.id);
+        } catch (e) {
+          console.error('Error deleting forex JE:', e);
         }
       }
 
@@ -1722,18 +2013,63 @@ export const SupplierSettlements: React.FC = () => {
           </div>
 
           {selectedSupplierId ? (
-            <div className="space-y-6">
+            <div className="space-y-4">
+              {/* Realized Forex Difference Info Card if active */}
+              {forexCalculation.hasForex && (
+                <div className="p-2.5 px-3 rounded-2xl border border-amber-200 bg-linear-to-r from-amber-50/90 via-orange-50/50 to-amber-50/90 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-white shadow-xs ${forexCalculation.isGain ? 'bg-emerald-600' : 'bg-rose-600'}`}>
+                      💱
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-zinc-800 text-[11px]">
+                          {language === 'ar' ? 'فروق تقييم العملة المحققة:' : 'Realized Forex Difference:'}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-md font-black text-xs font-mono ${forexCalculation.isGain ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                          {forexCalculation.isGain ? '+' : ''}{formatMoney(forexCalculation.netGainLoss)} {t('common.currency')}
+                          <span className="ms-1 text-[10px] font-semibold">
+                            ({forexCalculation.isGain ? (language === 'ar' ? 'أرباح فروق عملة' : 'Gain') : (language === 'ar' ? 'خسائر فروق عملة' : 'Loss')})
+                          </span>
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-zinc-500 font-medium mt-0.5">
+                        {language === 'ar' 
+                          ? `احتساب فرق العملة على ${formatNumber(forexCalculation.matchedForeignAmount)} ${forexCalculation.currency} متطابقة، وباقي المبلغ يستخدم في التسوية فقط.`
+                          : `Forex calculated on ${formatNumber(forexCalculation.matchedForeignAmount)} ${forexCalculation.currency} matched, remaining amount used for settlement only.`}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-[11px]">
+                    <div className="bg-white/80 border border-amber-200/80 px-2.5 py-1 rounded-xl shadow-2xs">
+                      <span className="text-[10px] text-zinc-400 font-bold block">{language === 'ar' ? 'الحساب الافتراضي المتأثر:' : 'Default Affected Account:'}</span>
+                      <span className="font-bold text-zinc-700 font-mono text-xs">
+                        {forexCalculation.account ? `${forexCalculation.account.code} - ${forexCalculation.account.name}` : (forexCalculation.isGain ? '420201 - أرباح فروق عملة محققة' : '630201 - خسائر فروق عملة محققة')}
+                      </span>
+                    </div>
+
+                    <div className="bg-white/80 border border-amber-200/80 px-2.5 py-1 rounded-xl shadow-2xs">
+                      <span className="text-[10px] text-zinc-400 font-bold block">{language === 'ar' ? 'رقم قيد اليومية التلقائي:' : 'Auto Journal Entry No.:'}</span>
+                      <span className="font-bold text-emerald-700 font-mono text-xs">
+                        {previewJeNumber || '-'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {layoutMode === 'split' ? (
-                /* 1. CURRENT SPLIT TABLE LAYOUT with Compact Spreadsheet styling */
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                /* 1. COMPACT SPLIT TABLE LAYOUT */
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {/* Debit Side Column */}
-                  <div className="bg-white rounded-3xl border border-zinc-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
-                    <div className="p-3 bg-red-50/60 border-b border-red-100 flex items-center justify-between">
-                      <span className="font-bold text-red-700 text-xs flex items-center gap-2">
+                  <div className="bg-white rounded-2xl border border-zinc-200 shadow-xs overflow-hidden flex flex-col min-h-[350px]">
+                    <div className="p-2.5 px-3 bg-red-50/60 border-b border-red-100 flex items-center justify-between">
+                      <span className="font-bold text-red-700 text-xs flex items-center gap-1.5">
                         <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                         {language === 'ar' ? 'الجانب المدين (دفعات / مرتجعات / إعفاءات)' : 'Debit Side (Payments / Returns / Allowances)'}
                       </span>
-                      <span className="bg-red-100 text-red-800 text-[10px] px-2.5 py-0.5 rounded-full font-bold">
+                      <span className="bg-red-100 text-red-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
                         {language === 'ar' ? 'إجمالي المسوى:' : 'Total Settled:'} {formatMoney(totalSettledDebit)} {t('common.currency')}
                       </span>
                     </div>
@@ -1742,89 +2078,91 @@ export const SupplierSettlements: React.FC = () => {
                       <table className="w-full text-right border-collapse text-xs border border-zinc-200">
                         <thead>
                           <tr className="bg-zinc-100 text-zinc-600 font-bold uppercase tracking-wider text-[10px]">
-                            <th className="p-1.5 border border-zinc-200 w-20 text-center">
-                              <div className="flex items-center justify-center gap-1">
-                                <input 
-                                  type="checkbox"
-                                  className="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5 cursor-pointer"
-                                  checked={isAllDebitSelected}
-                                  onChange={(e) => handleSelectAllDebits(e.target.checked)}
-                                />
-                                <span>{language === 'ar' ? 'تحديد' : 'Select'}</span>
-                              </div>
+                            <th className="p-1 px-1.5 border border-zinc-200 w-12 text-center">
+                              <input 
+                                type="checkbox" 
+                                className="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5 cursor-pointer"
+                                checked={isAllDebitSelected}
+                                onChange={(e) => handleSelectAllDebits(e.target.checked)}
+                              />
                             </th>
-                            <th className="p-1.5 border border-zinc-200">{language === 'ar' ? 'نوع الحركة' : 'Doc Type'}</th>
-                            <th className="p-1.5 border border-zinc-200">{language === 'ar' ? 'رقم المستند' : 'Doc No.'}</th>
-                            <th className="p-1.5 border border-zinc-200">{t('settlements.movement_date')}</th>
+                            <th className="p-1 px-1.5 border border-zinc-200">{language === 'ar' ? 'نوع الحركة' : 'Doc Type'}</th>
+                            <th className="p-1 px-1.5 border border-zinc-200">{language === 'ar' ? 'رقم المستند' : 'Doc No.'}</th>
+                            <th className="p-1 px-1.5 border border-zinc-200">{t('settlements.movement_date')}</th>
                             {hasForeignMovements && (
                               <>
-                                <th className="p-1.5 border border-zinc-200 text-right">{language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</th>
-                                <th className="p-1.5 border border-zinc-200 text-center">{language === 'ar' ? 'العملة' : 'Currency'}</th>
-                                <th className="p-1.5 border border-zinc-200 text-right">{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</th>
+                                <th className="p-1 px-1.5 border border-zinc-200 text-right bg-amber-50/40 text-amber-900">{language === 'ar' ? 'المتبقي (أجنبي)' : 'Open (FX)'}</th>
+                                <th className="p-1 px-1.5 border border-zinc-200 text-center">{language === 'ar' ? 'العملة' : 'Curr'}</th>
+                                <th className="p-1 px-1.5 border border-zinc-200 text-right">{language === 'ar' ? 'سعر الصرف' : 'Rate'}</th>
+                                <th className="p-1 px-1.5 border border-zinc-200 w-24 text-right bg-amber-50/60 text-amber-900">{language === 'ar' ? 'المسوى (أجنبي)' : 'Settle (FX)'}</th>
                               </>
                             )}
-                            <th className="p-1.5 border border-zinc-200 text-right">{t('settlements.movement_amount')}</th>
-                            <th className="p-1.5 border border-zinc-200 text-right">{t('settlements.movement_remaining')}</th>
-                            <th className="p-1.5 border border-zinc-200 w-28 text-right">{t('settlements.movement_settle_amount')}</th>
+                            <th className="p-1 px-1.5 border border-zinc-200 text-right">{t('settlements.movement_amount')}</th>
+                            <th className="p-1 px-1.5 border border-zinc-200 text-right">{t('settlements.movement_remaining')}</th>
+                            <th className="p-1 px-1.5 border border-zinc-200 w-24 text-right bg-red-50/30 text-red-900">{t('settlements.movement_settle_amount')}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-200">
                           {processedDebitMovements.length === 0 ? (
                             <tr>
-                              <td colSpan={hasForeignMovements ? 10 : 7} className="p-6 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد حركات مدينة تطابق البحث' : 'No debit movements match search'}</td>
+                              <td colSpan={hasForeignMovements ? 11 : 7} className="p-6 text-center text-zinc-400 italic text-xs">{language === 'ar' ? 'لا توجد حركات مدينة تطابق البحث' : 'No debit movements match search'}</td>
                             </tr>
                           ) : (
                             processedDebitMovements.map(m => (
                               <tr key={m.id} className={`hover:bg-zinc-50 transition-colors ${m.selected ? 'bg-emerald-50/15' : ''}`}>
-                                <td className="p-1 text-center border border-zinc-200">
+                                <td className="p-0.5 text-center border border-zinc-200">
                                   <input 
                                     type="checkbox" 
-                                    className="rounded text-emerald-600 focus:ring-emerald-500 h-4.5 w-4.5 cursor-pointer"
+                                    className="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5 cursor-pointer"
                                     checked={m.selected}
                                     onChange={(e) => handleToggleDebit(m.id, e.target.checked)}
                                   />
                                 </td>
-                                <td className="p-1 px-2 border border-zinc-200 font-semibold text-zinc-500">{getDocTypeLabel(m.page_name, true, m.type_label)}</td>
-                                <td className="p-1 px-2 border border-zinc-200 font-bold">
+                                <td className="p-0.5 px-1.5 border border-zinc-200 font-semibold text-zinc-600 text-[11px]">{getDocTypeLabel(m.page_name, true, m.type_label)}</td>
+                                <td className="p-0.5 px-1.5 border border-zinc-200 font-bold text-[11px]">
                                   <button
                                     onClick={() => navigateToDoc(m.page_name, m.original_id)}
                                     className="text-emerald-600 hover:text-emerald-700 hover:underline flex items-center gap-1 focus:outline-none"
                                   >
                                     <span>{m.number}</span>
-                                    <ExternalLink size={10} className="opacity-40" />
+                                    <ExternalLink size={9} className="opacity-40" />
                                   </button>
                                 </td>
-                                <td className="p-1 px-2 border border-zinc-200 text-zinc-500">{formatDate(m.date)}</td>
+                                <td className="p-0.5 px-1.5 border border-zinc-200 text-zinc-500 text-[11px]">{formatDate(m.date)}</td>
                                 {hasForeignMovements && (
                                   <>
-                                    <td className="p-1 px-2 border border-zinc-200 text-right font-mono font-semibold">
-                                      {m.currency && m.currency !== systemCurrency && m.foreign_amount !== null && m.foreign_amount !== undefined ? (
-                                        <span dir="ltr" className="inline-block font-mono font-bold text-rose-700">
-                                          - {formatNumber(m.foreign_amount)}
-                                        </span>
-                                      ) : (
-                                        <span className="text-zinc-400 font-mono">-</span>
-                                      )}
+                                    <td className="p-0.5 px-1.5 border border-zinc-200 text-right font-mono font-bold text-[11px] text-amber-900 bg-amber-50/20">
+                                      {m.currency && m.currency !== systemCurrency ? formatNumber(m.foreign_open_amount !== undefined ? m.foreign_open_amount : Math.abs(m.foreign_amount || 0)) : '-'}
                                     </td>
-                                    <td className="p-1 px-2 border border-zinc-200 text-center">
-                                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${m.currency && m.currency !== systemCurrency ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-zinc-100 text-zinc-600'}`}>
+                                    <td className="p-0.5 px-1 border border-zinc-200 text-center">
+                                      <span className={`px-1 py-0.2 rounded text-[9px] font-bold font-mono ${m.currency && m.currency !== systemCurrency ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-zinc-100 text-zinc-600'}`}>
                                         {m.currency || systemCurrency}
                                       </span>
                                     </td>
-                                    <td className="p-1 px-2 border border-zinc-200 text-right font-mono text-zinc-600">
-                                      {m.currency && m.currency !== systemCurrency && m.exchange_rate && m.exchange_rate !== 1
-                                        ? formatNumber(m.exchange_rate)
-                                        : '-'}
+                                    <td className="p-0.5 px-1.5 border border-zinc-200 text-right font-mono text-zinc-600 text-[11px]">
+                                      {m.currency && m.currency !== systemCurrency && m.exchange_rate && m.exchange_rate !== 1 ? formatNumber(m.exchange_rate) : '-'}
+                                    </td>
+                                    <td className="p-0.5 px-1 border border-zinc-200 text-right bg-amber-50/40">
+                                      {m.currency && m.currency !== systemCurrency ? (
+                                        <input 
+                                          type="number"
+                                          step="any"
+                                          className="h-6 px-1.5 py-0 bg-white border border-amber-300 rounded text-right font-black text-amber-900 focus:ring-1 focus:ring-amber-500 outline-none text-[11px] w-full"
+                                          value={m.foreign_settled_amount || ''}
+                                          placeholder="0.00"
+                                          onChange={(e) => handleDebitForeignAmountChange(m.id, parseFloat(e.target.value) || 0)}
+                                        />
+                                      ) : '-'}
                                     </td>
                                   </>
                                 )}
-                                <td className="p-1 px-2 border border-zinc-200 text-right font-semibold text-zinc-500">{formatNumber(m.original_amount)}</td>
-                                <td className="p-1 px-2 border border-zinc-200 text-right font-bold text-zinc-800">{formatNumber(m.open_amount)}</td>
-                                <td className="p-0.5 border border-zinc-200 text-right">
+                                <td className="p-0.5 px-1.5 border border-zinc-200 text-right font-semibold text-zinc-500 text-[11px]">{formatNumber(m.original_amount)}</td>
+                                <td className="p-0.5 px-1.5 border border-zinc-200 text-right font-bold text-zinc-800 text-[11px]">{formatNumber(m.open_amount)}</td>
+                                <td className="p-0.5 px-1 border border-zinc-200 text-right bg-red-50/30">
                                   <input 
                                     type="number"
                                     step="any"
-                                    className="w-full px-2 py-1 bg-transparent border-0 text-right font-black text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-xs"
+                                    className="h-6 px-1.5 py-0 bg-white border border-red-200 rounded text-right font-black text-red-700 focus:ring-1 focus:ring-red-500 outline-none text-[11px] w-full"
                                     value={m.settled_amount || ''}
                                     placeholder="0.00"
                                     onChange={(e) => handleDebitAmountChange(m.id, parseFloat(e.target.value) || 0)}
@@ -1839,13 +2177,13 @@ export const SupplierSettlements: React.FC = () => {
                   </div>
 
                   {/* Credit Side Column */}
-                  <div className="bg-white rounded-3xl border border-zinc-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
-                    <div className="p-3 bg-emerald-50/60 border-b border-emerald-100 flex items-center justify-between">
-                      <span className="font-bold text-emerald-700 text-xs flex items-center gap-2">
+                  <div className="bg-white rounded-2xl border border-zinc-200 shadow-xs overflow-hidden flex flex-col min-h-[350px]">
+                    <div className="p-2.5 px-3 bg-emerald-50/60 border-b border-emerald-100 flex items-center justify-between">
+                      <span className="font-bold text-emerald-700 text-xs flex items-center gap-1.5">
                         <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                         {language === 'ar' ? 'الجانب الدائن (المستندات المطلوبة / فواتير المشتريات)' : 'Credit Side (Required Documents / Purchase Invoices)'}
                       </span>
-                      <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2.5 py-0.5 rounded-full font-bold">
+                      <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
                         {language === 'ar' ? 'إجمالي المسوى:' : 'Total Settled:'} {formatMoney(totalSettledCredit)} {t('common.currency')}
                       </span>
                     </div>
@@ -1854,89 +2192,91 @@ export const SupplierSettlements: React.FC = () => {
                       <table className="w-full text-right border-collapse text-xs border border-zinc-200">
                         <thead>
                           <tr className="bg-zinc-100 text-zinc-600 font-bold uppercase tracking-wider text-[10px]">
-                            <th className="p-1.5 border border-zinc-200 w-20 text-center">
-                              <div className="flex items-center justify-center gap-1">
-                                <input 
-                                  type="checkbox" 
-                                  className="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5 cursor-pointer"
-                                  checked={isAllCreditSelected}
-                                  onChange={(e) => handleSelectAllCredits(e.target.checked)}
-                                />
-                                <span>{language === 'ar' ? 'تحديد' : 'Select'}</span>
-                              </div>
+                            <th className="p-1 px-1.5 border border-zinc-200 w-12 text-center">
+                              <input 
+                                type="checkbox" 
+                                className="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5 cursor-pointer"
+                                checked={isAllCreditSelected}
+                                onChange={(e) => handleSelectAllCredits(e.target.checked)}
+                              />
                             </th>
-                            <th className="p-1.5 border border-zinc-200">{language === 'ar' ? 'نوع الحركة' : 'Doc Type'}</th>
-                            <th className="p-1.5 border border-zinc-200">{language === 'ar' ? 'رقم المستند' : 'Doc No.'}</th>
-                            <th className="p-1.5 border border-zinc-200">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                            <th className="p-1 px-1.5 border border-zinc-200">{language === 'ar' ? 'نوع الحركة' : 'Doc Type'}</th>
+                            <th className="p-1 px-1.5 border border-zinc-200">{language === 'ar' ? 'رقم المستند' : 'Doc No.'}</th>
+                            <th className="p-1 px-1.5 border border-zinc-200">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
                             {hasForeignMovements && (
                               <>
-                                <th className="p-1.5 border border-zinc-200 text-right">{language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</th>
-                                <th className="p-1.5 border border-zinc-200 text-center">{language === 'ar' ? 'العملة' : 'Currency'}</th>
-                                <th className="p-1.5 border border-zinc-200 text-right">{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</th>
+                                <th className="p-1 px-1.5 border border-zinc-200 text-right bg-amber-50/40 text-amber-900">{language === 'ar' ? 'المتبقي (أجنبي)' : 'Open (FX)'}</th>
+                                <th className="p-1 px-1.5 border border-zinc-200 text-center">{language === 'ar' ? 'العملة' : 'Curr'}</th>
+                                <th className="p-1 px-1.5 border border-zinc-200 text-right">{language === 'ar' ? 'سعر الصرف' : 'Rate'}</th>
+                                <th className="p-1 px-1.5 border border-zinc-200 w-24 text-right bg-amber-50/60 text-amber-900">{language === 'ar' ? 'المسوى (أجنبي)' : 'Settle (FX)'}</th>
                               </>
                             )}
-                            <th className="p-1.5 border border-zinc-200 text-right">{language === 'ar' ? 'المبلغ' : 'Amount'}</th>
-                            <th className="p-1.5 border border-zinc-200 text-right">{language === 'ar' ? 'المتبقي' : 'Remaining'}</th>
-                            <th className="p-1.5 border border-zinc-200 w-28 text-right">{language === 'ar' ? 'المبلغ المسوى' : 'Settled Amount'}</th>
+                            <th className="p-1 px-1.5 border border-zinc-200 text-right">{language === 'ar' ? 'المبلغ' : 'Amount'}</th>
+                            <th className="p-1 px-1.5 border border-zinc-200 text-right">{language === 'ar' ? 'المتبقي' : 'Remaining'}</th>
+                            <th className="p-1 px-1.5 border border-zinc-200 w-24 text-right bg-emerald-50/30 text-emerald-900">{language === 'ar' ? 'المسوى' : 'Settled'}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-200">
                           {processedCreditMovements.length === 0 ? (
                             <tr>
-                              <td colSpan={hasForeignMovements ? 10 : 7} className="p-6 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد حركات دائنة تطابق البحث' : 'No credit movements match search'}</td>
+                              <td colSpan={hasForeignMovements ? 11 : 7} className="p-6 text-center text-zinc-400 italic text-xs">{language === 'ar' ? 'لا توجد حركات دائنة تطابق البحث' : 'No credit movements match search'}</td>
                             </tr>
                           ) : (
                             processedCreditMovements.map(m => (
                               <tr key={m.id} className={`hover:bg-zinc-50 transition-colors ${m.selected ? 'bg-emerald-50/15' : ''}`}>
-                                <td className="p-1 text-center border border-zinc-200">
+                                <td className="p-0.5 text-center border border-zinc-200">
                                   <input 
                                     type="checkbox" 
-                                    className="rounded text-emerald-600 focus:ring-emerald-500 h-4.5 w-4.5 cursor-pointer"
+                                    className="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5 cursor-pointer"
                                     checked={m.selected}
                                     onChange={(e) => handleToggleCredit(m.id, e.target.checked)}
                                   />
                                 </td>
-                                <td className="p-1 px-2 border border-zinc-200 font-semibold text-zinc-500">{getDocTypeLabel(m.page_name, false, m.type_label)}</td>
-                                <td className="p-1 px-2 border border-zinc-200 font-bold">
+                                <td className="p-0.5 px-1.5 border border-zinc-200 font-semibold text-zinc-600 text-[11px]">{getDocTypeLabel(m.page_name, false, m.type_label)}</td>
+                                <td className="p-0.5 px-1.5 border border-zinc-200 font-bold text-[11px]">
                                   <button
                                     onClick={() => navigateToDoc(m.page_name, m.original_id)}
                                     className="text-emerald-600 hover:text-emerald-700 hover:underline flex items-center gap-1 focus:outline-none"
                                   >
                                     <span>{m.number}</span>
-                                    <ExternalLink size={10} className="opacity-40" />
+                                    <ExternalLink size={9} className="opacity-40" />
                                   </button>
                                 </td>
-                                <td className="p-1 px-2 border border-zinc-200 text-zinc-500">{formatDate(m.date)}</td>
+                                <td className="p-0.5 px-1.5 border border-zinc-200 text-zinc-500 text-[11px]">{formatDate(m.date)}</td>
                                 {hasForeignMovements && (
                                   <>
-                                    <td className="p-1 px-2 border border-zinc-200 text-right font-mono font-semibold">
-                                      {m.currency && m.currency !== systemCurrency && m.foreign_amount !== null && m.foreign_amount !== undefined ? (
-                                        <span dir="ltr" className="inline-block font-mono font-bold text-emerald-700">
-                                          + {formatNumber(m.foreign_amount)}
-                                        </span>
-                                      ) : (
-                                        <span className="text-zinc-400 font-mono">-</span>
-                                      )}
+                                    <td className="p-0.5 px-1.5 border border-zinc-200 text-right font-mono font-bold text-[11px] text-amber-900 bg-amber-50/20">
+                                      {m.currency && m.currency !== systemCurrency ? formatNumber(m.foreign_open_amount !== undefined ? m.foreign_open_amount : Math.abs(m.foreign_amount || 0)) : '-'}
                                     </td>
-                                    <td className="p-1 px-2 border border-zinc-200 text-center">
-                                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${m.currency && m.currency !== systemCurrency ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-zinc-100 text-zinc-600'}`}>
+                                    <td className="p-0.5 px-1 border border-zinc-200 text-center">
+                                      <span className={`px-1 py-0.2 rounded text-[9px] font-bold font-mono ${m.currency && m.currency !== systemCurrency ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-zinc-100 text-zinc-600'}`}>
                                         {m.currency || systemCurrency}
                                       </span>
                                     </td>
-                                    <td className="p-1 px-2 border border-zinc-200 text-right font-mono text-zinc-600">
-                                      {m.currency && m.currency !== systemCurrency && m.exchange_rate && m.exchange_rate !== 1
-                                        ? formatNumber(m.exchange_rate)
-                                        : '-'}
+                                    <td className="p-0.5 px-1.5 border border-zinc-200 text-right font-mono text-zinc-600 text-[11px]">
+                                      {m.currency && m.currency !== systemCurrency && m.exchange_rate && m.exchange_rate !== 1 ? formatNumber(m.exchange_rate) : '-'}
+                                    </td>
+                                    <td className="p-0.5 px-1 border border-zinc-200 text-right bg-amber-50/40">
+                                      {m.currency && m.currency !== systemCurrency ? (
+                                        <input 
+                                          type="number"
+                                          step="any"
+                                          className="h-6 px-1.5 py-0 bg-white border border-amber-300 rounded text-right font-black text-amber-900 focus:ring-1 focus:ring-amber-500 outline-none text-[11px] w-full"
+                                          value={m.foreign_settled_amount || ''}
+                                          placeholder="0.00"
+                                          onChange={(e) => handleCreditForeignAmountChange(m.id, parseFloat(e.target.value) || 0)}
+                                        />
+                                      ) : '-'}
                                     </td>
                                   </>
                                 )}
-                                <td className="p-1 px-2 border border-zinc-200 text-right font-semibold text-zinc-500">{formatNumber(m.original_amount)}</td>
-                                <td className="p-1 px-2 border border-zinc-200 text-right font-bold text-zinc-800">{formatNumber(m.open_amount)}</td>
-                                <td className="p-0.5 border border-zinc-200 text-right">
+                                <td className="p-0.5 px-1.5 border border-zinc-200 text-right font-semibold text-zinc-500 text-[11px]">{formatNumber(m.original_amount)}</td>
+                                <td className="p-0.5 px-1.5 border border-zinc-200 text-right font-bold text-zinc-800 text-[11px]">{formatNumber(m.open_amount)}</td>
+                                <td className="p-0.5 px-1 border border-zinc-200 text-right bg-emerald-50/30">
                                   <input 
                                     type="number"
                                     step="any"
-                                    className="w-full px-2 py-1 bg-transparent border-0 text-right font-black text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-xs"
+                                    className="h-6 px-1.5 py-0 bg-white border border-emerald-200 rounded text-right font-black text-emerald-700 focus:ring-1 focus:ring-emerald-500 outline-none text-[11px] w-full"
                                     value={m.settled_amount || ''}
                                     placeholder="0.00"
                                     onChange={(e) => handleCreditAmountChange(m.id, parseFloat(e.target.value) || 0)}
@@ -1951,70 +2291,89 @@ export const SupplierSettlements: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                /* 2. NEW UNIFIED SINGLE TABLE LAYOUT with separate debit/credit columns and compact spreadsheet styling */
-                <div className="bg-white rounded-3xl border border-zinc-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
-                  <div className="p-3 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between">
-                    <span className="font-bold text-zinc-700 text-xs flex items-center gap-2">
-                      <SlidersHorizontal size={16} className="text-emerald-600" />
+                /* 2. COMPACT UNIFIED SINGLE TABLE LAYOUT (Excel Grid) */
+                <div className="bg-white rounded-2xl border border-zinc-200 shadow-xs overflow-hidden flex flex-col min-h-[350px]">
+                  <div className="p-2 px-3 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between">
+                    <span className="font-bold text-zinc-700 text-xs flex items-center gap-1.5">
+                      <SlidersHorizontal size={14} className="text-emerald-600" />
                       {language === 'ar' ? 'عرض الجدول الموحد المحاسبي (Excel Grid)' : 'Show Accounting Unified Grid (Excel Grid)'}
                     </span>
-                    <div className="flex items-center gap-3 text-xs">
+                    <div className="flex items-center gap-2.5 text-xs">
                       <span className="bg-red-50 text-red-700 px-2 py-0.5 rounded border border-red-100 font-bold">
                         {language === 'ar' ? 'مدين:' : 'Debit:'} {formatMoney(totalSettledDebit)}
                       </span>
                       <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-100 font-bold">
                         {language === 'ar' ? 'دائن:' : 'Credit:'} {formatMoney(totalSettledCredit)}
                       </span>
+                      {forexCalculation.hasForex && (
+                        <span className={`px-2 py-0.5 rounded border font-bold ${forexCalculation.isGain ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
+                          {language === 'ar' ? 'فرق العملة:' : 'Forex:'} {formatMoney(forexCalculation.netGainLoss)}
+                        </span>
+                      )}
                     </div>
                   </div>
 
                   <div className="flex-1 overflow-x-auto">
                     <table className="w-full text-right border-collapse text-xs border border-zinc-200">
                       <thead>
-                        <tr className="bg-zinc-100 text-zinc-600 font-black text-[10px] uppercase">
-                          <th className="p-2 border border-zinc-200 w-20 text-center" rowSpan={2}>
+                        <tr className="bg-zinc-100 text-zinc-600 font-bold text-[10px] uppercase">
+                          <th className="p-1 px-1.5 border border-zinc-200 w-12 text-center" rowSpan={2}>
                             <div className="flex flex-col items-center justify-center gap-0.5">
                               <input 
-                                type="checkbox"
+                                type="checkbox" 
                                 className="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5 cursor-pointer"
                                 checked={isAllUnifiedSelected}
                                 onChange={(e) => handleSelectAllUnified(e.target.checked)}
                               />
-                              <span>{language === 'ar' ? 'تحديد الكل' : 'Select All'}</span>
+                              <span className="text-[9px]">{language === 'ar' ? 'الكل' : 'All'}</span>
                             </div>
                           </th>
-                          <th className="p-2 border border-zinc-200" rowSpan={2}>{t('settlements.movement_date')}</th>
-                          <th className="p-2 border border-zinc-200" rowSpan={2}>{language === 'ar' ? 'نوع الحركة' : 'Doc Type'}</th>
-                          <th className="p-2 border border-zinc-200" rowSpan={2}>{language === 'ar' ? 'رقم المستند' : 'Doc No.'}</th>
+                          <th className="p-1 px-1.5 border border-zinc-200 w-20" rowSpan={2}>{t('settlements.movement_date')}</th>
+                          <th className="p-1 px-1.5 border border-zinc-200 w-24" rowSpan={2}>{language === 'ar' ? 'نوع الحركة' : 'Doc Type'}</th>
+                          <th className="p-1 px-1.5 border border-zinc-200 w-28" rowSpan={2}>{language === 'ar' ? 'رقم المستند' : 'Doc No.'}</th>
+                          <th className="p-1 px-1 border border-zinc-200 text-center w-12" rowSpan={2}>{language === 'ar' ? 'العملة' : 'Curr'}</th>
+                          <th className="p-1 px-1.5 border border-zinc-200 text-right w-16" rowSpan={2}>{language === 'ar' ? 'سعر الصرف' : 'Rate'}</th>
+                          
                           {hasForeignMovements && (
-                            <>
-                              <th className="p-2 border border-zinc-200 text-right" rowSpan={2}>{language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</th>
-                              <th className="p-2 border border-zinc-200 text-center" rowSpan={2}>{language === 'ar' ? 'العملة' : 'Currency'}</th>
-                              <th className="p-2 border border-zinc-200 text-right" rowSpan={2}>{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</th>
-                            </>
+                            <th className="p-1 border border-zinc-200 text-center bg-amber-50/70 text-amber-900 font-bold" colSpan={3}>
+                              {language === 'ar' ? 'حركات العملة الأجنبية' : 'Foreign Movements'}
+                            </th>
                           )}
-                          <th className="p-1 border border-zinc-200 text-center bg-red-50/50 text-red-700 font-bold" colSpan={2}>{language === 'ar' ? 'الحركات المدينة (Debit)' : 'Debit Movements (Debit)'}</th>
-                          <th className="p-1 border border-zinc-200 text-center bg-emerald-50/50 text-emerald-700 font-bold" colSpan={2}>{language === 'ar' ? 'الحركات الدائنة (Credit)' : 'Credit Movements (Credit)'}</th>
+                          <th className="p-1 border border-zinc-200 text-center bg-red-50/50 text-red-700 font-bold" colSpan={2}>
+                            {language === 'ar' ? 'الحركات المدينة (عملة النظام)' : 'Debit Movements (Debit)'}
+                          </th>
+                          <th className="p-1 border border-zinc-200 text-center bg-emerald-50/50 text-emerald-700 font-bold" colSpan={2}>
+                            {language === 'ar' ? 'الحركات الدائنة (عملة النظام)' : 'Credit Movements (Credit)'}
+                          </th>
                         </tr>
                         <tr className="bg-zinc-100 text-zinc-500 text-[9px] uppercase">
-                          <th className="p-1.5 border border-zinc-200 text-right w-24 bg-red-50/30">{language === 'ar' ? 'المتبقي' : 'Remaining'}</th>
-                          <th className="p-1.5 border border-zinc-200 text-right w-32 bg-red-50/30">{language === 'ar' ? 'المسوى' : 'Settled'}</th>
-                          <th className="p-1.5 border border-zinc-200 text-right w-24 bg-emerald-50/30">{language === 'ar' ? 'المتبقي' : 'Remaining'}</th>
-                          <th className="p-1.5 border border-zinc-200 text-right w-32 bg-emerald-50/30">{language === 'ar' ? 'المسوى' : 'Settled'}</th>
+                          {hasForeignMovements && (
+                            <>
+                              <th className="p-1 border border-zinc-200 text-right w-20 bg-amber-50/30 text-amber-900">{language === 'ar' ? 'المتبقي' : 'Remaining'}</th>
+                              <th className="p-1 border border-zinc-200 text-right w-24 bg-amber-50/50 text-amber-900 font-bold">{language === 'ar' ? 'مدين (أجنبي)' : 'Debit (FX)'}</th>
+                              <th className="p-1 border border-zinc-200 text-right w-24 bg-amber-50/50 text-amber-900 font-bold">{language === 'ar' ? 'دائن (أجنبي)' : 'Credit (FX)'}</th>
+                            </>
+                          )}
+                          <th className="p-1 border border-zinc-200 text-right w-20 bg-red-50/30 text-red-900">{language === 'ar' ? 'المتبقي' : 'Remaining'}</th>
+                          <th className="p-1 border border-zinc-200 text-right w-24 bg-red-50/40 text-red-900 font-bold">{language === 'ar' ? 'المسوى' : 'Settled'}</th>
+                          <th className="p-1 border border-zinc-200 text-right w-20 bg-emerald-50/30 text-emerald-900">{language === 'ar' ? 'المتبقي' : 'Remaining'}</th>
+                          <th className="p-1 border border-zinc-200 text-right w-24 bg-emerald-50/40 text-emerald-900 font-bold">{language === 'ar' ? 'المسوى' : 'Settled'}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-zinc-200">
                         {unifiedMovements.length === 0 ? (
                           <tr>
-                            <td colSpan={hasForeignMovements ? 11 : 8} className="p-8 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد حركات تطابق خيارات التصفية والبحث' : 'No movements match selected search filters'}</td>
+                            <td colSpan={hasForeignMovements ? 13 : 10} className="p-6 text-center text-zinc-400 italic text-xs">
+                              {language === 'ar' ? 'لا توجد حركات تطابق خيارات التصفية والبحث' : 'No movements match selected search filters'}
+                            </td>
                           </tr>
                         ) : (
                           unifiedMovements.map(m => (
                             <tr key={m.id} className={`hover:bg-zinc-50 transition-colors ${m.selected ? 'bg-emerald-50/15' : ''}`}>
-                              <td className="p-1 text-center border border-zinc-200">
+                              <td className="p-0.5 text-center border border-zinc-200">
                                 <input 
                                   type="checkbox" 
-                                  className="rounded text-emerald-600 focus:ring-emerald-500 h-4.5 w-4.5 cursor-pointer"
+                                  className="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5 cursor-pointer"
                                   checked={m.selected}
                                   onChange={(e) => {
                                     if (m.isDebit) {
@@ -2025,57 +2384,81 @@ export const SupplierSettlements: React.FC = () => {
                                   }}
                                 />
                               </td>
-                              <td className="p-1 px-2 border border-zinc-200 text-zinc-500 font-semibold">{formatDate(m.date)}</td>
-                              <td className="p-1 px-2 border border-zinc-200 text-zinc-500 font-bold">{getDocTypeLabel(m.page_name, m.isDebit, m.type_label)}</td>
-                              <td className="p-1 px-2 border border-zinc-200 font-bold">
+                              <td className="p-0.5 px-1.5 border border-zinc-200 text-zinc-500 font-semibold text-[11px]">{formatDate(m.date)}</td>
+                              <td className="p-0.5 px-1.5 border border-zinc-200 text-zinc-600 font-bold text-[11px]">{getDocTypeLabel(m.page_name, m.isDebit, m.type_label)}</td>
+                              <td className="p-0.5 px-1.5 border border-zinc-200 font-bold text-[11px]">
                                 <button
                                   onClick={() => navigateToDoc(m.page_name, m.original_id)}
                                   className="text-emerald-600 hover:text-emerald-700 hover:underline flex items-center gap-1 focus:outline-none"
                                 >
                                   <span>{m.number}</span>
-                                  <ExternalLink size={10} className="opacity-40" />
+                                  <ExternalLink size={9} className="opacity-40" />
                                 </button>
                               </td>
+                              <td className="p-0.5 px-1 border border-zinc-200 text-center">
+                                <span className={`px-1 py-0.2 rounded text-[9px] font-bold font-mono ${m.currency && m.currency !== systemCurrency ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-zinc-100 text-zinc-600'}`}>
+                                  {m.currency || systemCurrency}
+                                </span>
+                              </td>
+                              <td className="p-0.5 px-1.5 border border-zinc-200 text-right font-mono text-zinc-600 text-[11px]">
+                                {m.currency && m.currency !== systemCurrency && m.exchange_rate && m.exchange_rate !== 1
+                                  ? formatNumber(m.exchange_rate)
+                                  : '-'}
+                              </td>
 
+                              {/* Foreign Currency Columns */}
                               {hasForeignMovements && (
                                 <>
-                                  <td className="p-1 px-2 border border-zinc-200 text-right font-mono font-semibold">
-                                    {m.currency && m.currency !== systemCurrency && m.foreign_amount !== null && m.foreign_amount !== undefined ? (
-                                      <span
-                                        dir="ltr"
-                                        className={`inline-block font-mono font-bold ${
-                                          getMovementSign(m) === '+' ? 'text-emerald-700' : 'text-rose-700'
-                                        }`}
-                                      >
-                                        {getMovementSign(m)} {formatNumber(m.foreign_amount)}
+                                  <td className="p-0.5 px-1.5 border border-zinc-200 text-right font-mono font-bold text-[11px] bg-amber-50/20 text-amber-900">
+                                    {m.currency && m.currency !== systemCurrency ? (
+                                      <span dir="ltr" className="inline-block font-mono">
+                                        {formatNumber(m.foreign_open_amount !== undefined ? m.foreign_open_amount : Math.abs(m.foreign_amount || 0))}
                                       </span>
                                     ) : (
-                                      <span className="text-zinc-400 font-mono">-</span>
+                                      <span className="text-zinc-300 font-mono">-</span>
                                     )}
                                   </td>
-                                  <td className="p-1 px-2 border border-zinc-200 text-center">
-                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${m.currency && m.currency !== systemCurrency ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-zinc-100 text-zinc-600'}`}>
-                                      {m.currency || systemCurrency}
-                                    </span>
+                                  <td className="p-0.5 px-1 border border-zinc-200 text-right bg-amber-50/30">
+                                    {m.isDebit && m.currency && m.currency !== systemCurrency ? (
+                                      <input 
+                                        type="number"
+                                        step="any"
+                                        className="h-6 px-1.5 py-0 bg-white border border-amber-300 rounded text-right font-black text-amber-900 focus:ring-1 focus:ring-amber-500 outline-none text-[11px] w-full"
+                                        value={m.foreign_settled_amount || ''}
+                                        placeholder="0.00"
+                                        onChange={(e) => handleDebitForeignAmountChange(m.id, parseFloat(e.target.value) || 0)}
+                                      />
+                                    ) : (
+                                      <span className="text-zinc-300 font-mono text-center block">-</span>
+                                    )}
                                   </td>
-                                  <td className="p-1 px-2 border border-zinc-200 text-right font-mono text-zinc-600">
-                                    {m.currency && m.currency !== systemCurrency && m.exchange_rate && m.exchange_rate !== 1
-                                      ? formatNumber(m.exchange_rate)
-                                      : '-'}
+                                  <td className="p-0.5 px-1 border border-zinc-200 text-right bg-amber-50/30">
+                                    {!m.isDebit && m.currency && m.currency !== systemCurrency ? (
+                                      <input 
+                                        type="number"
+                                        step="any"
+                                        className="h-6 px-1.5 py-0 bg-white border border-amber-300 rounded text-right font-black text-amber-900 focus:ring-1 focus:ring-amber-500 outline-none text-[11px] w-full"
+                                        value={m.foreign_settled_amount || ''}
+                                        placeholder="0.00"
+                                        onChange={(e) => handleCreditForeignAmountChange(m.id, parseFloat(e.target.value) || 0)}
+                                      />
+                                    ) : (
+                                      <span className="text-zinc-300 font-mono text-center block">-</span>
+                                    )}
                                   </td>
                                 </>
                               )}
                               
-                              {/* Debit columns */}
-                              <td className="p-1 px-2 border border-zinc-200 text-right bg-red-50/5 text-red-600 font-semibold">
+                              {/* Debit columns (system currency) */}
+                              <td className="p-0.5 px-1.5 border border-zinc-200 text-right bg-red-50/5 text-red-600 font-semibold text-[11px]">
                                 {m.isDebit ? formatNumber(m.open_amount) : '-'}
                               </td>
-                              <td className="p-0.5 border border-zinc-200 text-right bg-red-50/5">
+                              <td className="p-0.5 px-1 border border-zinc-200 text-right bg-red-50/15">
                                 {m.isDebit ? (
                                   <input 
                                     type="number"
                                     step="any"
-                                    className="w-full px-2 py-1 bg-transparent border-0 text-right font-black text-red-600 focus:ring-1 focus:ring-red-500 outline-none text-xs"
+                                    className="h-6 px-1.5 py-0 bg-white border border-red-200 rounded text-right font-black text-red-700 focus:ring-1 focus:ring-red-500 outline-none text-[11px] w-full"
                                     value={m.settled_amount || ''}
                                     placeholder="0.00"
                                     onChange={(e) => handleDebitAmountChange(m.id, parseFloat(e.target.value) || 0)}
@@ -2083,16 +2466,16 @@ export const SupplierSettlements: React.FC = () => {
                                 ) : '-'}
                               </td>
 
-                              {/* Credit columns */}
-                              <td className="p-1 px-2 border border-zinc-200 text-right bg-emerald-50/5 text-emerald-600 font-semibold">
+                              {/* Credit columns (system currency) */}
+                              <td className="p-0.5 px-1.5 border border-zinc-200 text-right bg-emerald-50/5 text-emerald-600 font-semibold text-[11px]">
                                 {!m.isDebit ? formatNumber(m.open_amount) : '-'}
                               </td>
-                              <td className="p-0.5 border border-zinc-200 text-right bg-emerald-50/5">
+                              <td className="p-0.5 px-1 border border-zinc-200 text-right bg-emerald-50/15">
                                 {!m.isDebit ? (
                                   <input 
                                     type="number"
                                     step="any"
-                                    className="w-full px-2 py-1 bg-transparent border-0 text-right font-black text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-xs"
+                                    className="h-6 px-1.5 py-0 bg-white border border-emerald-200 rounded text-right font-black text-emerald-700 focus:ring-1 focus:ring-emerald-500 outline-none text-[11px] w-full"
                                     value={m.settled_amount || ''}
                                     placeholder="0.00"
                                     onChange={(e) => handleCreditAmountChange(m.id, parseFloat(e.target.value) || 0)}
@@ -2109,7 +2492,7 @@ export const SupplierSettlements: React.FC = () => {
               )}
 
               {/* Attachments Section */}
-              <div className="bg-white p-3 rounded-2xl border border-zinc-200 shadow-sm">
+              <div className="bg-white p-2.5 rounded-2xl border border-zinc-200 shadow-2xs">
                 <AttachmentsManager
                   attachments={attachments}
                   onChange={setAttachments}
@@ -2117,12 +2500,55 @@ export const SupplierSettlements: React.FC = () => {
               </div>
 
               {/* Summary Bottom Actions Card */}
-              <div className="bg-slate-900 p-3.5 rounded-2xl text-white flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg">
-                <div className="flex flex-wrap items-center gap-5">
+              <div className="bg-slate-900 p-3 rounded-2xl text-white flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-lg">
+                <div className="flex flex-wrap items-center gap-4">
                   <div className="space-y-0.5">
                     <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">{language === 'ar' ? 'إجمالي المدين المسوى' : 'Total Settled Debit'}</span>
-                    <p className="text-base font-bold text-red-400">{formatMoney(totalSettledDebit)} {t('common.currency')}</p>
+                    <p className="text-base font-bold text-red-400 font-mono">{formatMoney(totalSettledDebit)} {t('common.currency')}</p>
                   </div>
+                  <div className="w-px h-7 bg-zinc-800 hidden md:block" />
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">{language === 'ar' ? 'إجمالي الدائن المسوى' : 'Total Settled Credit'}</span>
+                    <p className="text-base font-bold text-emerald-400 font-mono">{formatMoney(totalSettledCredit)} {t('common.currency')}</p>
+                  </div>
+                  <div className="w-px h-7 bg-zinc-800 hidden md:block" />
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">{language === 'ar' ? 'الفرق' : 'Difference'}</span>
+                    <p className={`text-base font-bold font-mono ${difference <= 0.01 || (forexCalculation.hasForex && Math.abs(difference - Math.abs(forexCalculation.netGainLoss)) <= 0.05) ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {formatMoney(difference)} {t('common.currency')}
+                    </p>
+                  </div>
+
+                  {forexCalculation.hasForex && (
+                    <>
+                      <div className="w-px h-7 bg-zinc-800 hidden md:block" />
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider">{language === 'ar' ? 'فروق العملة المحققة' : 'Realized Forex'}</span>
+                        <p className={`text-base font-bold font-mono ${forexCalculation.isGain ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {forexCalculation.isGain ? '+' : ''}{formatMoney(forexCalculation.netGainLoss)} {t('common.currency')}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div>
+                  <button
+                    onClick={handleSaveSettlement}
+                    disabled={
+                      (!forexCalculation.hasForex && difference > 0.01) ||
+                      (forexCalculation.hasForex && Math.abs(difference - Math.abs(forexCalculation.netGainLoss)) > 0.05) ||
+                      totalSettledDebit === 0
+                    }
+                    className="w-full md:w-auto px-4 py-2 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition-all shadow-md shadow-emerald-500/20 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 text-xs"
+                  >
+                    <Check size={16} />
+                    {language === 'ar' ? 'تثبيت وحفظ التسوية' : 'Commit & Save Settlement'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (      </div>
                   <div className="w-px h-8 bg-zinc-800 hidden md:block" />
                   <div className="space-y-0.5">
                     <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">{language === 'ar' ? 'إجمالي الدائن المسوى' : 'Total Settled Credit'}</span>
