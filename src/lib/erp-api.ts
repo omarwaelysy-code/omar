@@ -2635,7 +2635,55 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
             );
             docCount = docRes.rows[0]?.cnt || 0;
             docTotal = parseFloat(docRes.rows[0]?.tot || 0);
-             // Actual calculation of legitimate secondary legs (COGS / restock / settlements / WHT / Discounts)
+          } catch (e) {
+            console.warn(`[DATA-AUDIT] Could not query source table ${cfg.table}:`, e);
+          }
+        }
+
+        // 2. Query journal_entries corresponding to this document type
+        const placeholders = cfg.refTypes.map((_: any, i: number) => `$${i + 2}`).join(',');
+        let whereJe = `company_id = $1 AND (reference_type IN (${placeholders}) ${cfg.isManualJE ? 'OR reference_type IS NULL' : ''})`;
+        if (cfg.jeFilter) {
+          whereJe += ` AND (${cfg.jeFilter})`;
+        }
+
+        const jeRes: any = await client.query(
+          `SELECT 
+             COUNT(*)::int as count, 
+             COALESCE(SUM(total_debit), 0)::numeric as gross_journal_value,
+             COUNT(CASE WHEN reference_number LIKE 'REV-%' OR entry_number LIKE 'REV-%' OR description LIKE '%عكس%' THEN 1 END)::int as reversal_count,
+             COALESCE(SUM(
+               CASE 
+                 WHEN reference_number LIKE 'REV-%' OR entry_number LIKE 'REV-%' OR description LIKE '%عكس%' THEN total_debit 
+                 ELSE 0 
+               END
+             ), 0)::numeric as reversal_value,
+             COALESCE(SUM(
+               CASE 
+                 WHEN reference_number LIKE 'REV-%' OR entry_number LIKE 'REV-%' OR description LIKE '%عكس%' THEN -total_debit 
+                 ELSE total_debit 
+               END
+             ), 0)::numeric as total_val,
+             COUNT(CASE WHEN ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) > 0.01 THEN 1 END)::int as unbal_cnt
+           FROM journal_entries
+           WHERE ${whereJe}`,
+          [companyId, ...cfg.refTypes]
+        );
+
+        const jeCount = jeRes.rows[0]?.count || 0;
+        const grossJournalValue = parseFloat(jeRes.rows[0]?.gross_journal_value || 0);
+        const reversalCount = jeRes.rows[0]?.reversal_count || 0;
+        const reversalValue = parseFloat(jeRes.rows[0]?.reversal_value || 0);
+        journalValue = parseFloat(jeRes.rows[0]?.total_val || 0);
+        totalValue = journalValue;
+        unbalancedCount = jeRes.rows[0]?.unbal_cnt || 0;
+
+        // Use source document count and total if available, otherwise fall back to journal entries
+        if (cfg.table && cfg.table !== 'journal_entries') {
+          count = docCount;
+          netValue = parseFloat(docTotal.toFixed(2));
+
+          // Actual calculation of legitimate secondary legs (COGS / restock / settlements / WHT / Discounts)
           // Computed directly from source documents & items — NEVER from journal entries, so true loopholes and variances are exposed!
           let actualCounter = 0;
           if (cfg.key === 'invoices') {
