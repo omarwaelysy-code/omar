@@ -396,7 +396,7 @@ export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, c
           )}
 
           <button
-            onClick={handleAutoFix}
+            onClick={() => handleAutoFix()}
             disabled={fixing}
             className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl font-bold text-xs flex items-center gap-2 shadow-md shadow-amber-600/20 transition-all active:scale-95 disabled:opacity-50"
           >
@@ -1545,7 +1545,6 @@ export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, c
                   );
                 }
 
-                const key = selectedItemIssues.key || '';
                 const isInvoiceOrReturn = key === 'invoices' || key === 'returns';
 
                 return (
