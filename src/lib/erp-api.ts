@@ -2390,7 +2390,8 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
         partyIdCol: null,
         partyTable: null,
         partyAccCol: null,
-        isManualJE: true
+        isManualJE: true,
+        jeFilter: "description NOT LIKE '%تسوية أرصدة عميل%' AND description NOT LIKE '%تسوية أرصدة مورد%' AND description NOT LIKE '%فروق عملة محققة - تسوية%'"
       },
       {
         key: 'cash_transfers',
@@ -2525,6 +2526,34 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
         amountCol: 'total_depreciation',
         refTypes: ['asset_depreciation', 'depreciation'],
         partyCol: 'period_name',
+        partyIdCol: null,
+        partyTable: null,
+        partyAccCol: null
+      },
+      {
+        key: 'customer_settlement_forex',
+        name: 'فروق عملة تسويات العملاء',
+        table: 'journal_entries',
+        numCol: 'entry_number',
+        dateCol: 'date',
+        amountCol: 'total_debit',
+        refTypes: ['customer_settlement_forex'],
+        jeFilter: "reference_type = 'customer_settlement_forex' OR description LIKE '%تسوية أرصدة عميل رقم%' OR description LIKE '%فروق عملة محققة - تسوية عميل%'",
+        partyCol: 'description',
+        partyIdCol: null,
+        partyTable: null,
+        partyAccCol: null
+      },
+      {
+        key: 'supplier_settlement_forex',
+        name: 'فروق عملة تسويات الموردين',
+        table: 'journal_entries',
+        numCol: 'entry_number',
+        dateCol: 'date',
+        amountCol: 'total_debit',
+        refTypes: ['supplier_settlement_forex'],
+        jeFilter: "reference_type = 'supplier_settlement_forex' OR description LIKE '%تسوية أرصدة مورد رقم%' OR description LIKE '%فروق عملة محققة - تسوية مورد%'",
+        partyCol: 'description',
         partyIdCol: null,
         partyTable: null,
         partyAccCol: null
@@ -3341,13 +3370,33 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
       console.error('Reports reconciliation audit error:', err);
     }
 
+    let glTotals = { count: 0, total_debit: 0, total_credit: 0 };
+    try {
+      const glRes = await client.query(`
+        SELECT 
+          COUNT(*)::int as count,
+          COALESCE(SUM(total_debit), 0)::numeric as total_debit,
+          COALESCE(SUM(total_credit), 0)::numeric as total_credit
+        FROM journal_entries
+        WHERE company_id = $1
+      `, [companyId]);
+      glTotals = {
+        count: glRes.rows[0]?.count || 0,
+        total_debit: parseFloat(glRes.rows[0]?.total_debit || 0),
+        total_credit: parseFloat(glRes.rows[0]?.total_credit || 0)
+      };
+    } catch (e) {
+      console.warn('[DATA-AUDIT] Could not query gl totals:', e);
+    }
+
     return {
       company_id: companyId,
       timestamp: new Date().toISOString(),
       master_data: masterData,
       operational_data: operationalData,
       posting_transactions: postingTransactions,
-      reports_reconciliation: reportsReconciliation
+      reports_reconciliation: reportsReconciliation,
+      gl_totals: glTotals
     };
   } catch (error: any) {
     console.error(`[AUDIT-ENGINE] Failed for company ${companyId}:`, error);

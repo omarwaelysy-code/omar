@@ -98,6 +98,11 @@ interface AuditData {
   operational_data: OperationalDataItem[];
   posting_transactions: PostingTransactionItem[];
   reports_reconciliation?: ReportReconciliationItem[];
+  gl_totals?: {
+    count: number;
+    total_debit: number;
+    total_credit: number;
+  };
 }
 
 export interface DataCountsValuesProps {
@@ -854,9 +859,145 @@ export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, c
 
                   <td className="py-2.5 px-3 text-center text-stone-400 font-bold text-[11px]">—</td>
                 </tr>
+
+                {/* ROW 2: GENERAL LEDGER JOURNAL ENTRIES TOTAL (إجمالي القيود بالدفتر العام) */}
+                {data?.gl_totals && (
+                  <tr className="bg-emerald-50/80 border-t border-emerald-200 font-black text-emerald-950">
+                    <td className="py-2.5 px-3 flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold flex-shrink-0">
+                        <BookOpen size={13} />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-black text-emerald-950">
+                          {language === 'ar' ? 'إجمالي قيود اليومية العامة (شاشة القيود التفصيلية)' : 'Total General Ledger Entries (Detailed JE)'}
+                        </span>
+                        <span className="text-[10px] text-emerald-700 font-normal">
+                          {language === 'ar' ? 'إجمالي الطرف المدين لكافة القيود المسجلة بالدفتر العام' : 'Total debits of all posted journal entries in GL'}
+                        </span>
+                      </div>
+                    </td>
+
+                    <td className="py-2.5 px-3 text-center">
+                      <span className="px-2 py-0.5 rounded-md bg-white border border-emerald-300 font-mono font-black text-emerald-900 text-xs">
+                        {formatNumber(data.gl_totals.count)} {language === 'ar' ? 'قيد' : 'JEs'}
+                      </span>
+                    </td>
+
+                    <td className="py-2.5 px-3 text-left font-mono text-stone-400 text-xs">—</td>
+                    <td className="py-2.5 px-3 text-left font-mono text-stone-400 text-xs">—</td>
+
+                    <td className="py-2.5 px-3 text-left font-mono font-black text-emerald-900 text-xs">
+                      {formatNumber(data.gl_totals.total_debit)} EGP
+                    </td>
+
+                    <td className="py-2.5 px-3 text-center font-mono text-xs">
+                      {(() => {
+                        const tableJournals = filteredPosting.reduce((s, r) => s + (r.journal_value || 0), 0);
+                        const diff = Number(((data.gl_totals?.total_debit || 0) - tableJournals).toFixed(2));
+                        return Math.abs(diff) < 0.5 ? (
+                          <span className="text-emerald-700 font-black">0.00</span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-black border border-amber-300">
+                            {formatNumber(diff)}
+                          </span>
+                        );
+                      })()}
+                    </td>
+
+                    <td className="py-2.5 px-3 text-center text-stone-400 text-xs">—</td>
+                    <td className="py-2.5 px-3 text-center text-stone-400 text-xs">—</td>
+                    <td className="py-2.5 px-3 text-center text-stone-400 text-xs">—</td>
+
+                    <td className="py-2.5 px-3 text-center">
+                      {(() => {
+                        const tableJournals = filteredPosting.reduce((s, r) => s + (r.journal_value || 0), 0);
+                        const diff = Math.abs((data.gl_totals?.total_debit || 0) - tableJournals);
+                        return diff < 0.5 ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-black text-[11px] border border-emerald-300">
+                            <CheckCircle2 size={12} />
+                            {language === 'ar' ? 'متطابق مع القيود' : 'GL Matched'}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-black text-[11px] border border-amber-300">
+                            <AlertTriangle size={12} />
+                            {language === 'ar' ? 'يوجد فارق قيود' : 'GL Discrepancy'}
+                          </span>
+                        );
+                      })()}
+                    </td>
+
+                    <td className="py-2.5 px-3 text-center">
+                      <button
+                        onClick={() => setCurrentPage('journal_entries')}
+                        className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-bold text-[11px] transition-all flex items-center gap-1 mx-auto shadow-xs"
+                      >
+                        <ExternalLink size={11} />
+                        <span>{language === 'ar' ? 'عرض القيود' : 'View JEs'}</span>
+                      </button>
+                    </td>
+                  </tr>
+                )}
               </tfoot>
             </table>
           </div>
+
+          {/* Detailed GL vs Movements Reconcile Banner (مقارنة إجمالي القيود بحركات التدقيق) */}
+          {data?.gl_totals && (() => {
+            const tableJournals = filteredPosting.reduce((s, r) => s + (r.journal_value || 0), 0);
+            const glDebit = data.gl_totals?.total_debit || 0;
+            const diff = Number((glDebit - tableJournals).toFixed(2));
+            const isBalanced = Math.abs(diff) < 0.5;
+
+            return (
+              <div className="p-4 bg-stone-900 text-white border-t border-stone-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold flex-shrink-0 border border-emerald-500/30">
+                    <BookOpen size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-white flex items-center gap-2">
+                      <span>{language === 'ar' ? 'مطابقة إجمالي الدفتر العام مع حركات التدقيق الشامل' : 'GL Reconciliation with Audit Transactions'}</span>
+                      {isBalanced ? (
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">
+                          {language === 'ar' ? 'مطابقة تامة' : 'Balanced'}
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold border border-amber-500/30">
+                          {language === 'ar' ? 'فارق إجمالي القيود' : 'GL Variance'}
+                        </span>
+                      )}
+                    </h3>
+                    <p className="text-xs text-stone-400 mt-0.5">
+                      {language === 'ar' 
+                        ? 'مقارنة الطرف المدين لجميع القيود المسجلة باليومية العامة مع القيود المقابلة للحركات المستندية' 
+                        : 'Comparing total debit GL entries against transaction-linked journal entries'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="bg-stone-800/80 px-3.5 py-2 rounded-xl border border-stone-700/60">
+                    <span className="text-[10px] text-stone-400 font-bold block">{language === 'ar' ? 'حركات الجدول الموزعة' : 'Table Journal Value'}</span>
+                    <span className="text-sm font-black font-mono text-emerald-400">{formatNumber(tableJournals)} EGP</span>
+                  </div>
+
+                  <div className="text-stone-500 font-black text-lg hidden sm:block">⇄</div>
+
+                  <div className="bg-stone-800/80 px-3.5 py-2 rounded-xl border border-stone-700/60">
+                    <span className="text-[10px] text-stone-400 font-bold block">{language === 'ar' ? 'إجمالي قيود اليومية العامة (المدين)' : 'Total General Ledger (Debit)'}</span>
+                    <span className="text-sm font-black font-mono text-blue-400">{formatNumber(glDebit)} EGP</span>
+                  </div>
+
+                  <div className={`px-3.5 py-2 rounded-xl border ${isBalanced ? 'bg-emerald-950/60 border-emerald-700/60 text-emerald-300' : 'bg-rose-950/60 border-rose-700/60 text-rose-300'}`}>
+                    <span className="text-[10px] font-bold block uppercase tracking-wider">{language === 'ar' ? 'الفرق' : 'Difference'}</span>
+                    <span className="text-sm font-black font-mono">
+                      {isBalanced ? '0.00 EGP' : `${diff > 0 ? '+' : ''}${formatNumber(diff)} EGP`}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 

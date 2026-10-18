@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { Supplier, Account, Currency, Company } from '../types';
-import { Search, Trash2, X, Layers, Truck, Calendar, ChevronDown, Check, Info, LayoutGrid, SlidersHorizontal, ExternalLink, Download, Edit3 } from 'lucide-react';
+import { Search, Trash2, X, Layers, Truck, Calendar, ChevronDown, Check, Info, LayoutGrid, SlidersHorizontal, ExternalLink, Download, Edit3, ArrowUpDown, CheckSquare, Square, Filter, Coins } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
@@ -85,6 +85,14 @@ export const SupplierSettlements: React.FC = () => {
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');
   const [settlementDate, setSettlementDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [searchTerm, setSearchTerm] = useState<string>('');
+
+  // History tab advanced filters & selection
+  const [selectedHistoryNums, setSelectedHistoryNums] = useState<string[]>([]);
+  const [historySupplierFilter, setHistorySupplierFilter] = useState<string>('');
+  const [historyFromDate, setHistoryFromDate] = useState<string>('');
+  const [historyToDate, setHistoryToDate] = useState<string>('');
+  const [historyDatePreset, setHistoryDatePreset] = useState<string>('all');
+  const [historySortBy, setHistorySortBy] = useState<string>('date_desc');
 
   // UI layout and search states
   const [layoutMode, setLayoutMode] = useState<'split' | 'unified'>('unified');
@@ -571,25 +579,179 @@ export const SupplierSettlements: React.FC = () => {
       const creditDocs = Array.from(creditMap.values());
       const total = debitDocs.reduce((sum, d) => sum + d.amount, 0);
 
+      // Look up forex journal entry if any
+      const forexJe = allJournalEntries.find((je: any) =>
+        je.reference_type === 'supplier_settlement_forex' &&
+        (je.reference_id === entry.settlement_number ||
+         je.reference_number === entry.settlement_number ||
+         je.description?.includes(entry.settlement_number))
+      );
+      let forex_diff = 0;
+      let is_forex_gain = false;
+      let forex_je_number = '';
+      let forex_je_id = '';
+
+      if (forexJe) {
+        forex_je_number = forexJe.entry_number || forexJe.id;
+        forex_je_id = forexJe.id;
+        const isGain = forexJe.description?.includes('أرباح') ||
+          forexJe.items?.some((it: any) => (it.credit > 0 && it.account_name?.includes('فروق')) || it.description?.includes('أرباح'));
+        const absAmt = Number(forexJe.total_debit) || Number(forexJe.total_credit) || 0;
+        is_forex_gain = !!isGain;
+        forex_diff = isGain ? absAmt : -absAmt;
+      }
+
+      const entityId = entry.entity_id || suppliers.find(s => s.name === entry.entity_name)?.id || '';
+
       return {
         settlement_number: entry.settlement_number,
         date: entry.date,
         entity_name: entry.entity_name,
-        entity_id: entry.entity_id,
+        entity_id: entityId,
         total_amount: total,
         debitDocs,
         creditDocs,
         created_from: entry.created_from,
-        attachments: entry.attachments
+        attachments: entry.attachments,
+        forex_diff,
+        is_forex_gain,
+        forex_je_number,
+        forex_je_id
       };
     });
 
-    // Filtering by search term
-    return list.filter(h => 
-      h.settlement_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      h.entity_name.toLowerCase().includes(searchTerm.toLowerCase())
-    ).sort((a, b) => b.settlement_number.localeCompare(a.settlement_number));
-  }, [allPurchaseInvoices, allPayments, searchTerm, language]);
+    // Filtering
+    const filtered = list.filter(h => {
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        const matches = h.settlement_number.toLowerCase().includes(term) ||
+          h.entity_name.toLowerCase().includes(term);
+        if (!matches) return false;
+      }
+      if (historySupplierFilter && h.entity_id !== historySupplierFilter) {
+        return false;
+      }
+      if (historyFromDate && h.date < historyFromDate) {
+        return false;
+      }
+      if (historyToDate && h.date > historyToDate) {
+        return false;
+      }
+      return true;
+    });
+
+    // Sorting
+    filtered.sort((a, b) => {
+      if (historySortBy === 'date_desc') {
+        return b.date.localeCompare(a.date) || b.settlement_number.localeCompare(a.settlement_number);
+      }
+      if (historySortBy === 'date_asc') {
+        return a.date.localeCompare(b.date) || a.settlement_number.localeCompare(b.settlement_number);
+      }
+      if (historySortBy === 'amount_desc') {
+        return b.total_amount - a.total_amount;
+      }
+      if (historySortBy === 'amount_asc') {
+        return a.total_amount - b.total_amount;
+      }
+      if (historySortBy === 'forex_desc') {
+        return Math.abs(b.forex_diff) - Math.abs(a.forex_diff);
+      }
+      if (historySortBy === 'num_desc') {
+        return b.settlement_number.localeCompare(a.settlement_number);
+      }
+      if (historySortBy === 'num_asc') {
+        return a.settlement_number.localeCompare(b.settlement_number);
+      }
+      return b.settlement_number.localeCompare(a.settlement_number);
+    });
+
+    return filtered;
+  }, [allPurchaseInvoices, allPayments, allJournalEntries, suppliers, searchTerm, historySupplierFilter, historyFromDate, historyToDate, historySortBy, language]);
+
+  // Date preset handler
+  const handleHistoryDatePreset = (preset: string) => {
+    setHistoryDatePreset(preset);
+    const now = new Date();
+    if (preset === 'all') {
+      setHistoryFromDate('');
+      setHistoryToDate('');
+    } else if (preset === 'today') {
+      const todayStr = now.toISOString().slice(0, 10);
+      setHistoryFromDate(todayStr);
+      setHistoryToDate(todayStr);
+    } else if (preset === 'this_week') {
+      const d = new Date(now);
+      const day = d.getDay();
+      const diff = (day + 1) % 7;
+      d.setDate(d.getDate() - diff);
+      setHistoryFromDate(d.toISOString().slice(0, 10));
+      setHistoryToDate(now.toISOString().slice(0, 10));
+    } else if (preset === 'this_month') {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      setHistoryFromDate(start.toISOString().slice(0, 10));
+      setHistoryToDate(now.toISOString().slice(0, 10));
+    } else if (preset === 'this_year') {
+      const start = new Date(now.getFullYear(), 0, 1);
+      setHistoryFromDate(start.toISOString().slice(0, 10));
+      setHistoryToDate(now.toISOString().slice(0, 10));
+    }
+  };
+
+  // History stats computation
+  const historyStats = useMemo(() => {
+    const totalCount = historyList.length;
+    const totalAmount = historyList.reduce((sum, h) => sum + h.total_amount, 0);
+    const gains = historyList.filter(h => h.forex_diff > 0).reduce((sum, h) => sum + h.forex_diff, 0);
+    const losses = historyList.filter(h => h.forex_diff < 0).reduce((sum, h) => sum + Math.abs(h.forex_diff), 0);
+    const netForex = gains - losses;
+    const countWithForex = historyList.filter(h => h.forex_diff !== 0).length;
+
+    const selectedItems = historyList.filter(h => selectedHistoryNums.includes(h.settlement_number));
+    const selectedCount = selectedItems.length;
+    const selectedAmount = selectedItems.reduce((sum, h) => sum + h.total_amount, 0);
+    const selectedForex = selectedItems.reduce((sum, h) => sum + h.forex_diff, 0);
+
+    return {
+      totalCount,
+      totalAmount,
+      gains,
+      losses,
+      netForex,
+      countWithForex,
+      selectedCount,
+      selectedAmount,
+      selectedForex
+    };
+  }, [historyList, selectedHistoryNums]);
+
+  const toggleSelectAllHistory = () => {
+    if (selectedHistoryNums.length === historyList.length && historyList.length > 0) {
+      setSelectedHistoryNums([]);
+    } else {
+      setSelectedHistoryNums(historyList.map(h => h.settlement_number));
+    }
+  };
+
+  const toggleSelectHistoryRow = (num: string) => {
+    setSelectedHistoryNums(prev =>
+      prev.includes(num) ? prev.filter(x => x !== num) : [...prev, num]
+    );
+  };
+
+  const handleExportSelectedExcel = () => {
+    const selectedItems = historyList.filter(h => selectedHistoryNums.includes(h.settlement_number));
+    if (selectedItems.length === 0) return;
+    const rows = selectedItems.map(h => ({
+      [language === 'ar' ? 'رقم التسوية' : 'Settlement No']: h.settlement_number,
+      [language === 'ar' ? 'التاريخ' : 'Date']: h.date,
+      [language === 'ar' ? 'المورد' : 'Supplier']: h.entity_name,
+      [language === 'ar' ? 'المبلغ المستوي' : 'Settled Amount']: h.total_amount,
+      [language === 'ar' ? 'فروق العملة' : 'Forex Diff']: h.forex_diff,
+      [language === 'ar' ? 'رقم قيد فروق العملة' : 'Forex JE No']: h.forex_je_number || '-'
+    }));
+    exportToExcel(rows, `supplier_settlements_selected_${new Date().toISOString().slice(0, 10)}`);
+  };
 
   // Clickable badge navigation to document details
   const navigateToDoc = (pageName: string, docId: string) => {
@@ -2636,39 +2798,216 @@ export const SupplierSettlements: React.FC = () => {
       ) : (
         /* Settlement History Tab */
         <div className="space-y-3">
-          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
-            <div className="p-2 sm:p-2.5 border-b border-zinc-100 flex items-center justify-between gap-3">
-              <div className="relative max-w-sm w-full">
-                <Search className="absolute left-2.5 top-2 text-zinc-400" size={14} />
+          {/* Top Summary Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="bg-white p-3 rounded-2xl border border-zinc-200/80 shadow-sm flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-zinc-400 block">{language === 'ar' ? 'عدد التسويات' : 'Settlements Count'}</span>
+                <span className="text-lg font-black text-zinc-800 font-mono">{historyStats.totalCount}</span>
+              </div>
+              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                <Layers size={18} />
+              </div>
+            </div>
+
+            <div className="bg-white p-3 rounded-2xl border border-zinc-200/80 shadow-sm flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-zinc-400 block">{language === 'ar' ? 'إجمالي المبالغ المسواة' : 'Total Settled'}</span>
+                <span className="text-base font-black text-emerald-600 font-mono">{formatMoney(historyStats.totalAmount)} {t('common.currency')}</span>
+              </div>
+              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                <Check size={18} />
+              </div>
+            </div>
+
+            <div className="bg-white p-3 rounded-2xl border border-zinc-200/80 shadow-sm flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-zinc-400 block">{language === 'ar' ? 'صافي فروق العملة' : 'Net Forex Diff'}</span>
+                <span className={`text-base font-black font-mono ${historyStats.netForex >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {historyStats.netForex > 0 ? '+' : ''}{formatMoney(historyStats.netForex)} {t('common.currency')}
+                </span>
+                <div className="text-[10px] text-zinc-400 mt-0.5">
+                  {historyStats.countWithForex} {language === 'ar' ? 'تسوية بها فروق' : 'with forex'}
+                </div>
+              </div>
+              <div className={`p-2 rounded-xl ${historyStats.netForex >= 0 ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'}`}>
+                <Coins size={18} />
+              </div>
+            </div>
+
+            <div className="bg-white p-3 rounded-2xl border border-zinc-200/80 shadow-sm flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-zinc-400 block">{language === 'ar' ? 'المحدد حالياً' : 'Currently Selected'}</span>
+                <span className="text-base font-black text-blue-600 font-mono">
+                  {historyStats.selectedCount > 0 ? `${historyStats.selectedCount}` : '0'}
+                </span>
+                {historyStats.selectedCount > 0 && (
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-[10px] font-bold text-blue-700 font-mono">({formatMoney(historyStats.selectedAmount)})</span>
+                    <button
+                      onClick={handleExportSelectedExcel}
+                      className="text-[10px] text-blue-600 hover:underline font-bold"
+                    >
+                      {language === 'ar' ? 'تصدير' : 'Export'}
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                <CheckSquare size={18} />
+              </div>
+            </div>
+          </div>
+
+          {/* Filter & Sort Toolbar */}
+          <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm p-3 space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2.5">
+              {/* Search */}
+              <div className="relative min-w-[200px] flex-1 max-w-sm">
+                <Search className="absolute left-2.5 top-2.5 text-zinc-400" size={14} />
                 <input
                   type="text"
                   placeholder={language === 'ar' ? 'البحث برقم التسوية أو المورد...' : 'Search by settlement number or supplier...'}
-                  className="w-full pl-8 pr-3 py-1 bg-zinc-50 border border-zinc-200/80 rounded-lg focus:ring-1 focus:ring-emerald-500 transition-all text-xs font-medium"
+                  className="w-full pl-8 pr-3 py-1.5 bg-zinc-50 border border-zinc-200/80 rounded-xl focus:ring-1 focus:ring-emerald-500 transition-all text-xs font-medium"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
+
+              {/* Supplier Filter */}
+              <div className="min-w-[180px] max-w-xs flex-1">
+                <select
+                  value={historySupplierFilter}
+                  onChange={(e) => setHistorySupplierFilter(e.target.value)}
+                  className="w-full py-1.5 px-3 bg-zinc-50 border border-zinc-200/80 rounded-xl text-xs font-medium focus:ring-1 focus:ring-emerald-500"
+                >
+                  <option value="">{language === 'ar' ? 'جميع الموردين' : 'All Suppliers'}</option>
+                  {suppliers.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Sort By */}
+              <div className="flex items-center gap-1.5">
+                <ArrowUpDown size={14} className="text-zinc-400" />
+                <select
+                  value={historySortBy}
+                  onChange={(e) => setHistorySortBy(e.target.value)}
+                  className="py-1.5 px-3 bg-zinc-50 border border-zinc-200/80 rounded-xl text-xs font-medium focus:ring-1 focus:ring-emerald-500"
+                >
+                  <option value="date_desc">{language === 'ar' ? 'الأحدث تاريخاً' : 'Newest Date'}</option>
+                  <option value="date_asc">{language === 'ar' ? 'الأقدم تاريخاً' : 'Oldest Date'}</option>
+                  <option value="amount_desc">{language === 'ar' ? 'الأعلى مبلغاً' : 'Highest Amount'}</option>
+                  <option value="amount_asc">{language === 'ar' ? 'الأقل مبلغاً' : 'Lowest Amount'}</option>
+                  <option value="forex_desc">{language === 'ar' ? 'الأعلى فروق عملة' : 'Highest Forex'}</option>
+                  <option value="num_desc">{language === 'ar' ? 'رقم التسوية (تنازلي)' : 'Settlement No (Desc)'}</option>
+                  <option value="num_asc">{language === 'ar' ? 'رقم التسوية (تصاعدي)' : 'Settlement No (Asc)'}</option>
+                </select>
+              </div>
             </div>
 
+            {/* Period presets and date inputs */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-100">
+              <div className="flex flex-wrap items-center gap-1">
+                <span className="text-[11px] font-bold text-zinc-400 ml-1.5">{language === 'ar' ? 'الفترة:' : 'Period:'}</span>
+                {[
+                  { id: 'all', label: language === 'ar' ? 'الكل' : 'All' },
+                  { id: 'today', label: language === 'ar' ? 'اليوم' : 'Today' },
+                  { id: 'this_week', label: language === 'ar' ? 'هذا الأسبوع' : 'This Week' },
+                  { id: 'this_month', label: language === 'ar' ? 'هذا الشهر' : 'This Month' },
+                  { id: 'this_year', label: language === 'ar' ? 'هذا العام' : 'This Year' },
+                ].map(preset => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => handleHistoryDatePreset(preset.id)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                      historyDatePreset === preset.id
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <span className="text-[11px] text-zinc-400 font-medium">{language === 'ar' ? 'من:' : 'From:'}</span>
+                  <input
+                    type="date"
+                    value={historyFromDate}
+                    onChange={(e) => { setHistoryFromDate(e.target.value); setHistoryDatePreset('custom'); }}
+                    className="py-1 px-2 bg-zinc-50 border border-zinc-200/80 rounded-lg text-xs font-mono"
+                  />
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[11px] text-zinc-400 font-medium">{language === 'ar' ? 'إلى:' : 'To:'}</span>
+                  <input
+                    type="date"
+                    value={historyToDate}
+                    onChange={(e) => { setHistoryToDate(e.target.value); setHistoryDatePreset('custom'); }}
+                    className="py-1 px-2 bg-zinc-50 border border-zinc-200/80 rounded-lg text-xs font-mono"
+                  />
+                </div>
+                {(historyFromDate || historyToDate || historySupplierFilter || searchTerm) && (
+                  <button
+                    onClick={() => {
+                      setHistoryFromDate('');
+                      setHistoryToDate('');
+                      setHistorySupplierFilter('');
+                      setSearchTerm('');
+                      setHistoryDatePreset('all');
+                    }}
+                    className="text-[11px] text-rose-600 hover:text-rose-800 font-bold px-2 py-1 hover:bg-rose-50 rounded-lg transition-all"
+                  >
+                    {language === 'ar' ? 'إعادة ضبط' : 'Reset'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
             <div ref={tableRef} className="overflow-x-auto">
               <table className="w-full text-right text-xs">
                 <thead>
                   <tr className="bg-zinc-50/80 text-zinc-500 text-[11px] font-bold uppercase tracking-wider border-b border-zinc-200">
+                    <th className="px-2.5 py-1.5 w-10 text-center">
+                      <input
+                        type="checkbox"
+                        checked={historyList.length > 0 && selectedHistoryNums.length === historyList.length}
+                        onChange={toggleSelectAllHistory}
+                        className="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                        title={language === 'ar' ? 'تحديد الكل' : 'Select All'}
+                      />
+                    </th>
                     <th className="px-2.5 py-1.5 whitespace-nowrap">{t('settlements.history_number')}</th>
                     <th className="px-2.5 py-1.5 whitespace-nowrap">{t('settlements.movement_date')}</th>
                     <th className="px-2.5 py-1.5 whitespace-nowrap">{t('discounts.column_supplier')}</th>
                     <th className="px-2.5 py-1.5 whitespace-nowrap text-left">{t('settlements.history_amount')}</th>
+                    <th className="px-2.5 py-1.5 whitespace-nowrap text-left">{language === 'ar' ? 'فروق العملة' : 'Forex Diff'}</th>
                     <th className="px-2.5 py-1.5 whitespace-nowrap text-left">{t('settlements.history_actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
                   {historyList.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-3 py-8 text-center text-zinc-400 italic text-xs">{t('settlements.history_no_data')}</td>
+                      <td colSpan={7} className="px-3 py-8 text-center text-zinc-400 italic text-xs">{t('settlements.history_no_data')}</td>
                     </tr>
                   ) : (
                     historyList.map(h => (
-                      <tr key={h.settlement_number} className="hover:bg-zinc-50/60 transition-colors group">
+                      <tr key={h.settlement_number} className={`hover:bg-zinc-50/60 transition-colors group ${selectedHistoryNums.includes(h.settlement_number) ? 'bg-emerald-50/30' : ''}`}>
+                        <td className="px-2.5 py-1 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedHistoryNums.includes(h.settlement_number)}
+                            onChange={() => toggleSelectHistoryRow(h.settlement_number)}
+                            className="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                          />
+                        </td>
                         <td className="px-2.5 py-1 whitespace-nowrap font-mono font-bold text-xs">
                           <span
                             onClick={() => handleSettlementNumberClick(h)}
@@ -2680,6 +3019,30 @@ export const SupplierSettlements: React.FC = () => {
                         <td className="px-2.5 py-1 whitespace-nowrap text-zinc-500 font-medium text-xs">{formatDate(h.date)}</td>
                         <td className="px-2.5 py-1 whitespace-nowrap font-semibold text-zinc-700 text-xs">{h.entity_name}</td>
                         <td className="px-2.5 py-1 whitespace-nowrap text-left font-bold text-emerald-600 text-xs">{formatMoney(h.total_amount)} {t('common.currency')}</td>
+                        <td className="px-2.5 py-1 whitespace-nowrap text-left font-mono font-bold text-xs">
+                          {h.forex_diff !== 0 ? (
+                            <div className="inline-flex items-center gap-1.5">
+                              <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
+                                h.is_forex_gain
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : 'bg-rose-50 text-rose-700 border border-rose-200'
+                              }`}>
+                                {h.is_forex_gain ? '+' : ''}{formatMoney(h.forex_diff)} {t('common.currency')}
+                              </span>
+                              {h.forex_je_id && (
+                                <button
+                                  onClick={() => navigateToDoc('journal_entries', h.forex_je_id)}
+                                  className="text-[10px] text-blue-600 hover:text-blue-800 hover:underline font-mono bg-blue-50 px-1 py-0.5 rounded border border-blue-100"
+                                  title={language === 'ar' ? 'عرض قيد فروق العملة' : 'View Forex JE'}
+                                >
+                                  #{h.forex_je_number}
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-zinc-300 font-mono">—</span>
+                          )}
+                        </td>
                         <td className="px-2.5 py-1 whitespace-nowrap text-left">
                           <div className="flex items-center justify-end gap-1.5 transition-all">
                             <button
