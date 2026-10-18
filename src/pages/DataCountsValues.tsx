@@ -27,7 +27,8 @@ import {
   Scale,
   BookOpen,
   CheckCheck,
-  ArrowRight
+  ArrowRight,
+  RotateCcw
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -69,6 +70,9 @@ interface PostingTransactionItem {
   net_value?: number;
   counter_value?: number;
   journal_value: number;
+  gross_journal_value?: number;
+  reversal_count?: number;
+  reversal_value?: number;
   variance: number;
   unposted_count: number;
   unposted_value: number;
@@ -644,8 +648,16 @@ export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, c
                     <div className="text-[10px] text-indigo-400 font-normal">{language === 'ar' ? 'ضرائب ومتمم (+)' : 'Tax/Sides (+)'}</div>
                   </th>
                   <th className="py-2 px-3 whitespace-nowrap text-left">
-                    <div>{language === 'ar' ? 'الطرف الآخر للقيد' : 'Journal Total'}</div>
-                    <div className="text-[10px] text-emerald-600 font-normal">{language === 'ar' ? 'المساوي للقيد (=)' : 'Total (=)'}</div>
+                    <div>{language === 'ar' ? 'إجمالي قيود اليومية' : 'Gross Journal'}</div>
+                    <div className="text-[10px] text-emerald-600 font-normal">{language === 'ar' ? 'الدفتر العام (Gross)' : 'GL Debit'}</div>
+                  </th>
+                  <th className="py-2 px-3 whitespace-nowrap text-center">
+                    <div>{language === 'ar' ? 'القيود العكسية' : 'Reversals'}</div>
+                    <div className="text-[10px] text-amber-500 font-normal">{language === 'ar' ? 'حركات ملغاة (-)' : 'Cancelled (-)'}</div>
+                  </th>
+                  <th className="py-2 px-3 whitespace-nowrap text-left">
+                    <div>{language === 'ar' ? 'صافي أثر القيود' : 'Net Journal'}</div>
+                    <div className="text-[10px] text-teal-600 font-normal">{language === 'ar' ? 'صافي النشاط (=)' : 'Net (=)'}</div>
                   </th>
                   <th className="py-2 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'فرق القيمة' : 'Variance'}</th>
                   <th className="py-2 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'حركات غير مرحلة' : 'Unposted'}</th>
@@ -682,7 +694,26 @@ export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, c
                         {formatNumber(row.counter_value || 0)} EGP
                       </td>
 
-                      <td className="py-1.5 px-3 text-left font-mono font-black text-emerald-700 text-xs">
+                      {/* إجمالي قيود اليومية (Gross) */}
+                      <td className="py-1.5 px-3 text-left font-mono font-black text-emerald-800 text-xs">
+                        {formatNumber(row.gross_journal_value ?? row.journal_value)} EGP
+                      </td>
+
+                      {/* القيود العكسية */}
+                      <td className="py-1.5 px-3 text-center font-mono text-xs">
+                        {(row.reversal_count || 0) > 0 ? (
+                          <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 font-black inline-flex items-center gap-1 shadow-xs">
+                            <RotateCcw size={10} className="text-amber-600" />
+                            <span>{formatNumber(row.reversal_value || 0)}</span>
+                            <span className="text-[10px] text-amber-700 font-normal">({row.reversal_count})</span>
+                          </span>
+                        ) : (
+                          <span className="text-stone-300 font-bold">—</span>
+                        )}
+                      </td>
+
+                      {/* صافي أثر القيود (Net) */}
+                      <td className="py-1.5 px-3 text-left font-mono font-black text-teal-700 text-xs">
                         {formatNumber(row.journal_value)} EGP
                       </td>
 
@@ -787,7 +818,30 @@ export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, c
                     {formatNumber(filteredPosting.reduce((s, r) => s + (r.counter_value || 0), 0))} EGP
                   </td>
 
-                  <td className="py-2.5 px-3 text-left font-mono font-black text-emerald-700 text-xs">
+                  {/* إجمالي قيود اليومية (Gross) */}
+                  <td className="py-2.5 px-3 text-left font-mono font-black text-emerald-900 text-xs">
+                    {formatNumber(filteredPosting.reduce((s, r) => s + (r.gross_journal_value ?? r.journal_value ?? 0), 0))} EGP
+                  </td>
+
+                  {/* إجمالي القيود العكسية */}
+                  <td className="py-2.5 px-3 text-center font-mono text-xs">
+                    {(() => {
+                      const totalRevVal = filteredPosting.reduce((s, r) => s + (r.reversal_value || 0), 0);
+                      const totalRevCnt = filteredPosting.reduce((s, r) => s + (r.reversal_count || 0), 0);
+                      return totalRevCnt > 0 ? (
+                        <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 font-black inline-flex items-center gap-1">
+                          <RotateCcw size={10} className="text-amber-700" />
+                          <span>{formatNumber(totalRevVal)}</span>
+                          <span className="text-[10px] text-amber-700 font-normal">({totalRevCnt})</span>
+                        </span>
+                      ) : (
+                        <span className="text-stone-400 font-bold">—</span>
+                      );
+                    })()}
+                  </td>
+
+                  {/* إجمالي صافي أثر القيود */}
+                  <td className="py-2.5 px-3 text-left font-mono font-black text-teal-900 text-xs">
                     {formatNumber(filteredPosting.reduce((s, r) => s + (r.journal_value || 0), 0))} EGP
                   </td>
 
@@ -890,10 +944,13 @@ export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, c
                       {formatNumber(data.gl_totals.total_debit)} EGP
                     </td>
 
+                    <td className="py-2.5 px-3 text-center text-stone-400 text-xs">—</td>
+                    <td className="py-2.5 px-3 text-left font-mono text-stone-400 text-xs">—</td>
+
                     <td className="py-2.5 px-3 text-center font-mono text-xs">
                       {(() => {
-                        const tableJournals = filteredPosting.reduce((s, r) => s + (r.journal_value || 0), 0);
-                        const diff = Number(((data.gl_totals?.total_debit || 0) - tableJournals).toFixed(2));
+                        const tableGross = filteredPosting.reduce((s, r) => s + (r.gross_journal_value ?? r.journal_value ?? 0), 0);
+                        const diff = Number(((data.gl_totals?.total_debit || 0) - tableGross).toFixed(2));
                         return Math.abs(diff) < 0.5 ? (
                           <span className="text-emerald-700 font-black">0.00</span>
                         ) : (
@@ -910,12 +967,12 @@ export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, c
 
                     <td className="py-2.5 px-3 text-center">
                       {(() => {
-                        const tableJournals = filteredPosting.reduce((s, r) => s + (r.journal_value || 0), 0);
-                        const diff = Math.abs((data.gl_totals?.total_debit || 0) - tableJournals);
+                        const tableGross = filteredPosting.reduce((s, r) => s + (r.gross_journal_value ?? r.journal_value ?? 0), 0);
+                        const diff = Math.abs((data.gl_totals?.total_debit || 0) - tableGross);
                         return diff < 0.5 ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-black text-[11px] border border-emerald-300">
                             <CheckCircle2 size={12} />
-                            {language === 'ar' ? 'متطابق مع القيود' : 'GL Matched'}
+                            {language === 'ar' ? 'متطابق مع القيود 100%' : '100% GL Matched'}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-black text-[11px] border border-amber-300">
@@ -943,9 +1000,12 @@ export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, c
 
           {/* Detailed GL vs Movements Reconcile Banner (مقارنة إجمالي القيود بحركات التدقيق) */}
           {data?.gl_totals && (() => {
-            const tableJournals = filteredPosting.reduce((s, r) => s + (r.journal_value || 0), 0);
+            const tableGross = filteredPosting.reduce((s, r) => s + (r.gross_journal_value ?? r.journal_value ?? 0), 0);
+            const totalRevVal = filteredPosting.reduce((s, r) => s + (r.reversal_value || 0), 0);
+            const totalRevCnt = filteredPosting.reduce((s, r) => s + (r.reversal_count || 0), 0);
+            const tableNet = filteredPosting.reduce((s, r) => s + (r.journal_value || 0), 0);
             const glDebit = data.gl_totals?.total_debit || 0;
-            const diff = Number((glDebit - tableJournals).toFixed(2));
+            const diff = Number((glDebit - tableGross).toFixed(2));
             const isBalanced = Math.abs(diff) < 0.5;
 
             return (
@@ -959,7 +1019,7 @@ export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, c
                       <span>{language === 'ar' ? 'مطابقة إجمالي الدفتر العام مع حركات التدقيق الشامل' : 'GL Reconciliation with Audit Transactions'}</span>
                       {isBalanced ? (
                         <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">
-                          {language === 'ar' ? 'مطابقة تامة' : 'Balanced'}
+                          {language === 'ar' ? 'مطابقة تامة 100%' : '100% Balanced'}
                         </span>
                       ) : (
                         <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold border border-amber-500/30">
@@ -969,28 +1029,36 @@ export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, c
                     </h3>
                     <p className="text-xs text-stone-400 mt-0.5">
                       {language === 'ar' 
-                        ? 'مقارنة الطرف المدين لجميع القيود المسجلة باليومية العامة مع القيود المقابلة للحركات المستندية' 
-                        : 'Comparing total debit GL entries against transaction-linked journal entries'}
+                        ? `مقارنة الطرف المدين للدفتر العام (${formatNumber(glDebit)} ج.م) مع إجمالي قيود الحركات (${formatNumber(tableGross)} ج.م) • يتضمن ${totalRevCnt} قيود عكسية بقيمة ${formatNumber(totalRevVal)} ج.م`
+                        : `Comparing GL Debits (${formatNumber(glDebit)}) with Audit Gross Journals (${formatNumber(tableGross)}) • includes ${totalRevCnt} reversals (${formatNumber(totalRevVal)})`}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="bg-stone-800/80 px-3.5 py-2 rounded-xl border border-stone-700/60">
-                    <span className="text-[10px] text-stone-400 font-bold block">{language === 'ar' ? 'حركات الجدول الموزعة' : 'Table Journal Value'}</span>
-                    <span className="text-sm font-black font-mono text-emerald-400">{formatNumber(tableJournals)} EGP</span>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="bg-stone-800/80 px-3 py-1.5 rounded-xl border border-stone-700/60">
+                    <span className="text-[10px] text-stone-400 font-bold block">{language === 'ar' ? 'إجمالي قيود الحركات (Gross)' : 'Audit Gross JEs'}</span>
+                    <span className="text-xs font-black font-mono text-emerald-400">{formatNumber(tableGross)} EGP</span>
                   </div>
 
-                  <div className="text-stone-500 font-black text-lg hidden sm:block">⇄</div>
-
-                  <div className="bg-stone-800/80 px-3.5 py-2 rounded-xl border border-stone-700/60">
-                    <span className="text-[10px] text-stone-400 font-bold block">{language === 'ar' ? 'إجمالي قيود اليومية العامة (المدين)' : 'Total General Ledger (Debit)'}</span>
-                    <span className="text-sm font-black font-mono text-blue-400">{formatNumber(glDebit)} EGP</span>
+                  <div className="bg-amber-950/40 px-3 py-1.5 rounded-xl border border-amber-800/50">
+                    <span className="text-[10px] text-amber-400 font-bold block">{language === 'ar' ? 'القيود العكسية (-)' : 'Reversals (-)'}</span>
+                    <span className="text-xs font-black font-mono text-amber-300">{formatNumber(totalRevVal)} EGP ({totalRevCnt})</span>
                   </div>
 
-                  <div className={`px-3.5 py-2 rounded-xl border ${isBalanced ? 'bg-emerald-950/60 border-emerald-700/60 text-emerald-300' : 'bg-rose-950/60 border-rose-700/60 text-rose-300'}`}>
+                  <div className="bg-stone-800/80 px-3 py-1.5 rounded-xl border border-stone-700/60">
+                    <span className="text-[10px] text-stone-400 font-bold block">{language === 'ar' ? 'صافي أثر الحركات (Net)' : 'Net JEs'}</span>
+                    <span className="text-xs font-black font-mono text-teal-400">{formatNumber(tableNet)} EGP</span>
+                  </div>
+
+                  <div className="bg-stone-800/80 px-3 py-1.5 rounded-xl border border-stone-700/60">
+                    <span className="text-[10px] text-stone-400 font-bold block">{language === 'ar' ? 'إجمالي اليومية العامة (GL)' : 'Total GL Debits'}</span>
+                    <span className="text-xs font-black font-mono text-blue-400">{formatNumber(glDebit)} EGP</span>
+                  </div>
+
+                  <div className={`px-3 py-1.5 rounded-xl border ${isBalanced ? 'bg-emerald-950/60 border-emerald-700/60 text-emerald-300' : 'bg-rose-950/60 border-rose-700/60 text-rose-300'}`}>
                     <span className="text-[10px] font-bold block uppercase tracking-wider">{language === 'ar' ? 'الفرق' : 'Difference'}</span>
-                    <span className="text-sm font-black font-mono">
+                    <span className="text-xs font-black font-mono">
                       {isBalanced ? '0.00 EGP' : `${diff > 0 ? '+' : ''}${formatNumber(diff)} EGP`}
                     </span>
                   </div>

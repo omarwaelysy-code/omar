@@ -2650,6 +2650,14 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
         const jeRes: any = await client.query(
           `SELECT 
              COUNT(*)::int as count, 
+             COALESCE(SUM(total_debit), 0)::numeric as gross_journal_value,
+             COUNT(CASE WHEN reference_number LIKE 'REV-%' OR entry_number LIKE 'REV-%' OR description LIKE '%عكس%' THEN 1 END)::int as reversal_count,
+             COALESCE(SUM(
+               CASE 
+                 WHEN reference_number LIKE 'REV-%' OR entry_number LIKE 'REV-%' OR description LIKE '%عكس%' THEN total_debit 
+                 ELSE 0 
+               END
+             ), 0)::numeric as reversal_value,
              COALESCE(SUM(
                CASE 
                  WHEN reference_number LIKE 'REV-%' OR entry_number LIKE 'REV-%' OR description LIKE '%عكس%' THEN -total_debit 
@@ -2663,6 +2671,9 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
         );
 
         const jeCount = jeRes.rows[0]?.count || 0;
+        const grossJournalValue = parseFloat(jeRes.rows[0]?.gross_journal_value || 0);
+        const reversalCount = jeRes.rows[0]?.reversal_count || 0;
+        const reversalValue = parseFloat(jeRes.rows[0]?.reversal_value || 0);
         journalValue = parseFloat(jeRes.rows[0]?.total_val || 0);
         totalValue = journalValue;
         unbalancedCount = jeRes.rows[0]?.unbal_cnt || 0;
@@ -2986,6 +2997,9 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
           net_value: netValue,
           counter_value: counterValue,
           journal_value: journalValue,
+          gross_journal_value: grossJournalValue,
+          reversal_count: reversalCount,
+          reversal_value: reversalValue,
           variance,
           unposted_count: unpostedCount,
           unposted_value: unpostedValue,
@@ -3003,6 +3017,9 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
           net_value: 0,
           counter_value: 0,
           journal_value: 0,
+          gross_journal_value: 0,
+          reversal_count: 0,
+          reversal_value: 0,
           variance: 0,
           unposted_count: 0,
           unposted_value: 0,
