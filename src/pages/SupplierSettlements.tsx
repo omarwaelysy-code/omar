@@ -41,7 +41,7 @@ export const SupplierSettlements: React.FC = () => {
   const { showNotification } = useNotification();
   const { t, dir, language } = useLanguage();
   const { setCurrentPage, setPendingViewDoc, pendingViewDoc } = useNavigation();
-  const { defaultAccounts: defaultAccountMap } = useDefaultAccounts();
+  const { defaultAccountMap } = useDefaultAccounts(user?.company_id);
   const [previewJeNumber, setPreviewJeNumber] = useState<string>('');
 
   // Database states
