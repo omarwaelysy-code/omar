@@ -644,8 +644,8 @@ export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, c
                     <div className="text-[10px] text-stone-400 font-normal">{language === 'ar' ? 'طرف أساسي (+)' : 'Base (+)'}</div>
                   </th>
                   <th className="py-2 px-3 whitespace-nowrap text-left">
-                    <div>{language === 'ar' ? 'باقي أطراف القيد' : 'Counter Sides'}</div>
-                    <div className="text-[10px] text-indigo-400 font-normal">{language === 'ar' ? 'ضرائب ومتمم (+)' : 'Tax/Sides (+)'}</div>
+                    <div>{language === 'ar' ? 'أطراف القيد المدينة الأخرى' : 'Other Debit Sides'}</div>
+                    <div className="text-[10px] text-indigo-500 font-bold">{language === 'ar' ? 'تكلفة المبيعات، الضرائب، النقدية (+)' : 'COGS, WHT, Cash (+)'}</div>
                   </th>
                   <th className="py-2 px-3 whitespace-nowrap text-left">
                     <div>{language === 'ar' ? 'إجمالي قيود اليومية' : 'Gross Journal'}</div>
