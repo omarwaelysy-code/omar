@@ -644,8 +644,8 @@ export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, c
                     <div className="text-[10px] text-stone-400 font-normal">{language === 'ar' ? 'طرف أساسي (+)' : 'Base (+)'}</div>
                   </th>
                   <th className="py-2 px-3 whitespace-nowrap text-left">
-                    <div>{language === 'ar' ? 'أطراف القيد المدينة الأخرى' : 'Other Debit Sides'}</div>
-                    <div className="text-[10px] text-indigo-500 font-bold">{language === 'ar' ? 'تكلفة المبيعات، الضرائب، النقدية (+)' : 'COGS, WHT, Cash (+)'}</div>
+                    <div>{language === 'ar' ? 'باقي أطراف القيد (المحتسبة)' : 'Calculated Entry Legs'}</div>
+                    <div className="text-[10px] text-indigo-500 font-bold">{language === 'ar' ? 'تكلفة المبيعات، الضرائب، التسويات (+)' : 'COGS, WHT, Cash (+)'}</div>
                   </th>
                   <th className="py-2 px-3 whitespace-nowrap text-left">
                     <div>{language === 'ar' ? 'إجمالي قيود اليومية' : 'Gross Journal'}</div>
@@ -659,7 +659,10 @@ export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, c
                     <div>{language === 'ar' ? 'صافي أثر القيود' : 'Net Journal'}</div>
                     <div className="text-[10px] text-teal-600 font-normal">{language === 'ar' ? 'صافي النشاط (=)' : 'Net (=)'}</div>
                   </th>
-                  <th className="py-2 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'فرق القيمة' : 'Variance'}</th>
+                  <th className="py-2 px-3 whitespace-nowrap text-center">
+                    <div>{language === 'ar' ? 'فارق القيود (الثغرات)' : 'Entry Variance'}</div>
+                    <div className="text-[10px] text-rose-500 font-bold">{language === 'ar' ? 'الفروق المكتشفة' : 'Loopholes'}</div>
+                  </th>
                   <th className="py-2 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'حركات غير مرحلة' : 'Unposted'}</th>
                   <th className="py-2 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'قيود غير متزنة' : 'Unbalanced'}</th>
                   <th className="py-2 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'حسابات ناقصة' : 'Missing Accounts'}</th>
@@ -669,7 +672,7 @@ export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, c
               </thead>
               <tbody className="divide-y divide-stone-100 font-bold text-stone-700">
                 {filteredPosting.map((row) => {
-                  const hasIssues = row.unposted_count > 0 || row.unbalanced_entries_count > 0 || row.missing_accounts_count > 0 || Math.abs(row.variance) > 1;
+                  const hasIssues = row.unposted_count > 0 || row.unbalanced_entries_count > 0 || row.missing_accounts_count > 0 || Math.abs(row.variance) > 1 || (row.issues && row.issues.length > 0);
 
                   return (
                     <tr key={row.key} className="hover:bg-stone-50/70 transition-colors">
@@ -766,7 +769,7 @@ export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, c
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 font-bold text-[11px] border border-rose-200">
                             <AlertTriangle size={12} />
-                            {language === 'ar' ? 'يحتاج مراجعة' : 'Check Required'}
+                            {language === 'ar' ? (row.issues?.length ? `ثغرات (${row.issues.length})` : 'يحتاج مراجعة') : 'Check Required'}
                           </span>
                         )}
                       </td>
