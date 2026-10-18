@@ -2943,6 +2943,22 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
                   detailMsg = `إجمالي القيد المحاسبي (${jeAmtVal.toLocaleString()} ج.م) أقل من القيمة المحتسبة للفاتورة ومكوناتها (${expectedVal.toLocaleString()} ج.م) بنقص قدره ${Math.abs(diffVal).toLocaleString()} ج.م`;
                 }
 
+                let rootCause = '';
+                let suggestedSolution = '';
+                if (jeCostVal > docCostVal && Math.abs(diffVal - (jeCostVal - docCostVal)) < 5) {
+                  rootCause = `تكرار الصنف داخل بنود الفاتورة أدى لاحتساب إجمالي التكلفة مكرراً في القيد المحاسبي (${jeCostVal.toLocaleString()} ج.م بدلاً من ${docCostVal.toLocaleString()} ج.م)`;
+                  suggestedSolution = `تجميع بنود الصنف وحذف أطراف التكلفة المكررة وإعادة قيد التكلفة الصحيحة (${docCostVal.toLocaleString()} ج.م)`;
+                } else if (jeCostVal === 0 && docCostVal > 0) {
+                  rootCause = `القيد المحاسبي يفتقر لطرف تكلفة البضاعة والمخزون، مسجل مبيعات فقط دون إثبات خروج البضاعة`;
+                  suggestedSolution = `إنشاء طرفي قيد التكلفة: مدين تكلفة مبيعات (51) ودائن المخزون (1115) بقيمة ${docCostVal.toLocaleString()} ج.م`;
+                } else if (diffVal > 0) {
+                  rootCause = `تضخم في بنود القيد مقارنة بالفاتورة (تكرار سداد أو اختلاف ضرائب/خصومات)`;
+                  suggestedSolution = `إعادة ترحيل ومزامنة القيد المحاسبي من واقع الفاتورة لحذف البنود الزائدة`;
+                } else {
+                  rootCause = `نقص في بنود القيد المحاسبي باليومية العامة مقارنة بالفاتورة`;
+                  suggestedSolution = `إعادة ترحيل القيد لإثبات كامل قيمة الفاتورة ومكوناتها بالدفتر`;
+                }
+
                 issues.push({
                   document_id: df.id,
                   document_number: df.doc_num || df.id,
@@ -2950,7 +2966,9 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
                   amount: docAmtVal,
                   party_name: df.party || '',
                   error_type: diffVal > 0 ? 'تضخم في بنود القيد المحاسبي' : 'نقص في بنود القيد المحاسبي',
-                  details: detailMsg
+                  details: detailMsg,
+                  root_cause: rootCause,
+                  suggested_solution: suggestedSolution
                 });
               }
             } else if (cfg.key === 'returns') {
@@ -2995,7 +3013,9 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
                   amount: docAmtVal,
                   party_name: df.party || '',
                   error_type: 'فارق في قيد مردودات المبيعات',
-                  details: `قيمة القيد المحاسبي (${jeAmtVal.toLocaleString()} ج.م) لا تطابق القيمة المحتسبة لمردود المبيعات وتكلفة الإرجاع (${expectedVal.toLocaleString()} ج.م) بفارق ${diffVal.toLocaleString()} ج.م`
+                  details: `قيمة القيد المحاسبي (${jeAmtVal.toLocaleString()} ج.م) لا تطابق القيمة المحتسبة لمردود المبيعات وتكلفة الإرجاع (${expectedVal.toLocaleString()} ج.م) بفارق ${diffVal.toLocaleString()} ج.م`,
+                  root_cause: 'تكرار بنود إرجاع المخزون في القيد أو ترحيل أسعار الصرف غير المحولة من العملة الأصلية',
+                  suggested_solution: 'إعادة مزامنة قيد المردودات وحذف السطور المكررة لإثبات صافي المردود وإرجاع المخزون بالتكلفة الدقيقة'
                 });
               }
             } else if (cfg.table && cfg.numCol && !['purchase_invoices', 'purchase_returns'].includes(cfg.key)) {
@@ -3030,7 +3050,9 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
                   error_type: isReverse ? 'فارق قيد (حركة عكسية)' : 'فارق في قيمة القيد المحاسبي',
                   details: isReverse
                     ? `قيمة المستند العكسي (${absDoc.toLocaleString()} ج.م) لا تطابق قيمة القيد المحاسبي (${jeAmtVal.toLocaleString()} ج.م) بفارق قدره ${trueDiff.toLocaleString()} ج.م`
-                    : `قيمة المستند (${docAmtVal.toLocaleString()} ج.م) لا تطابق قيمة القيد المحاسبي (${jeAmtVal.toLocaleString()} ج.م) بفارق ${trueDiff.toLocaleString()} ج.م`
+                    : `قيمة المستند (${docAmtVal.toLocaleString()} ج.م) لا تطابق قيمة القيد المحاسبي (${jeAmtVal.toLocaleString()} ج.م) بفارق ${trueDiff.toLocaleString()} ج.م`,
+                  root_cause: 'تعديل قيمة المستند بعد الترحيل أو وجود أطراف ثانوية غير معالجة بالقيد',
+                  suggested_solution: 'إعادة مزامنة وترحيل القيد المحاسبي من واقع المستند الحالي'
                 });
               }
             }
@@ -3718,6 +3740,89 @@ router.post('/system/auto-fix-missing-accounts', authenticateToken, authorizeRol
     });
   } catch (error: any) {
     await client.query('ROLLBACK').catch(() => {});
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Auto repair journal entry variances and COGS duplications for invoices and returns
+router.post('/system/auto-fix-audit-variances', authenticateToken, authorizeRoles('super_admin', 'admin'), async (req: AuthRequest, res) => {
+  const companyId = (req.user?.role === 'super_admin' && req.query.company_id)
+    ? String(req.query.company_id)
+    : req.user?.company_id;
+
+  if (!companyId) return res.status(400).json({ error: 'Company ID required' });
+  const key = req.query.key as string; // 'invoices' | 'returns' | undefined
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    let fixedInvoices = 0;
+    let fixedReturns = 0;
+    let fixedEntries = 0;
+
+    // 1. Fix Invoices COGS duplication and variances
+    if (!key || key === 'invoices') {
+      const invJes = await client.query(`
+        SELECT DISTINCT je.id as je_id, i.id as invoice_id
+        FROM invoices i
+        JOIN journal_entries je ON (je.reference_id = i.id::text OR je.reference_number = i.invoice_number)
+          AND je.company_id = i.company_id
+          AND je.reference_type IN ('invoice', 'sales_invoice')
+        WHERE i.company_id = $1
+      `, [companyId]);
+
+      for (const row of invJes.rows) {
+        await syncCOGSForJournalEntry(client, companyId, row.je_id, row.invoice_id, 'invoice');
+        await balanceAndValidateJournalEntry(client, row.je_id);
+        fixedInvoices++;
+      }
+    }
+
+    // 2. Fix Returns COGS duplication and variances
+    if (!key || key === 'returns') {
+      const retJes = await client.query(`
+        SELECT DISTINCT je.id as je_id, r.id as return_id
+        FROM returns r
+        JOIN journal_entries je ON (je.reference_id = r.id::text OR je.reference_number = r.return_number)
+          AND je.company_id = r.company_id
+          AND je.reference_type IN ('return', 'sales_return')
+        WHERE r.company_id = $1
+      `, [companyId]);
+
+      for (const row of retJes.rows) {
+        await syncCOGSForJournalEntry(client, companyId, row.je_id, row.return_id, 'return');
+        await balanceAndValidateJournalEntry(client, row.je_id);
+        fixedReturns++;
+      }
+    }
+
+    // 3. Fix any unbalanced entries
+    const unbalJes = await client.query(
+      `SELECT id FROM journal_entries 
+       WHERE company_id = $1 AND ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) > 0.001 
+         AND ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) <= 1.0`,
+      [companyId]
+    );
+    for (const je of unbalJes.rows) {
+      await balanceAndValidateJournalEntry(client, je.id);
+      fixedEntries++;
+    }
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: 'تم تجميع تكلفة المبيعات وإصلاح القيود وحذف التكرارات بنجاح وموازنة الدفاتر',
+      fixed_invoices: fixedInvoices,
+      fixed_returns: fixedReturns,
+      fixed_entries: fixedEntries
+    });
+  } catch (error: any) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[AUTO-FIX-AUDIT-VARIANCES] Error:', error);
     res.status(500).json({ error: error.message });
   } finally {
     client.release();

@@ -60,6 +60,8 @@ interface DocumentIssue {
   party_name?: string;
   error_type: string;
   details: string;
+  root_cause?: string;
+  suggested_solution?: string;
 }
 
 interface PostingTransactionItem {
@@ -169,18 +171,29 @@ export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, c
     fetchData();
   }, [user, companyId]);
 
-  const handleAutoFix = async () => {
+  const handleAutoFix = async (targetKey?: string) => {
     if (!user) return;
-    if (!window.confirm(language === 'ar' 
-      ? 'هل ترغب في ربط الحسابات الناقصة بالحسابات الافتراضية للشركة تلقائياً؟' 
-      : 'Do you want to automatically link missing accounts with company defaults?')) {
+    const isVarianceFix = targetKey === 'invoices' || targetKey === 'returns';
+    const confirmPrompt = isVarianceFix
+      ? (language === 'ar'
+          ? 'هل ترغب في إعادة تجميع تكلفة المبيعات ومزامنة القيود باليومية العامة وحذف التكرارات فوراً؟'
+          : 'Do you want to re-sync COGS and clean journal duplications immediately?')
+      : (language === 'ar' 
+          ? 'هل ترغب في ربط الحسابات الناقصة بالحسابات الافتراضية للشركة تلقائياً؟' 
+          : 'Do you want to automatically link missing accounts with company defaults?');
+    if (!window.confirm(confirmPrompt)) {
       return;
     }
 
     setFixing(true);
     try {
       const token = localStorage.getItem('auth_token');
-      const res = await fetch(`/api/erp/system/auto-fix-missing-accounts?company_id=${effectiveCompanyId}`, {
+      const isMissingAccounts = targetKey === 'missing_accounts' || (!targetKey && selectedItemIssues?.missing_accounts_count);
+      const url = isMissingAccounts
+        ? `/api/erp/system/auto-fix-missing-accounts?company_id=${effectiveCompanyId}`
+        : `/api/erp/system/auto-fix-audit-variances?company_id=${effectiveCompanyId}${targetKey ? `&key=${targetKey}` : ''}`;
+
+      const res = await fetch(url, {
         method: 'POST',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
@@ -1532,20 +1545,31 @@ export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, c
                   );
                 }
 
+                const key = selectedItemIssues.key || '';
+                const isInvoiceOrReturn = key === 'invoices' || key === 'returns';
+
                 return (
-                  <div className="my-4 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 text-xs font-bold space-y-2">
-                    <div className="flex items-center gap-2 font-black text-amber-800">
+                  <div className={`my-4 p-4 rounded-2xl border text-xs font-bold space-y-2 ${isInvoiceOrReturn ? 'bg-indigo-50/80 border-indigo-200 text-indigo-950' : 'bg-amber-50 border-amber-200 text-amber-950'}`}>
+                    <div className={`flex items-center gap-2 font-black ${isInvoiceOrReturn ? 'text-indigo-800' : 'text-amber-800'}`}>
                       <AlertCircle size={16} />
-                      <span>{language === 'ar' ? 'التشخيص والحل المقترح: فروق بين قيم المستندات وأطراف القيود:' : 'Diagnosis: Document-to-Journal Variances:'}</span>
+                      <span>
+                        {language === 'ar' 
+                          ? (isInvoiceOrReturn ? 'التشخيص والحل الجذري: تضخم قيود التكلفة والمخزون في اليومية العامة:' : 'التشخيص والحل المقترح: فروق بين قيم المستندات وأطراف القيود:') 
+                          : 'Diagnosis: Document-to-Journal Variances:'}
+                      </span>
                     </div>
-                    <p className="leading-relaxed text-amber-900">
+                    <p className={`leading-relaxed ${isInvoiceOrReturn ? 'text-indigo-950' : 'text-amber-900'}`}>
                       {language === 'ar'
-                        ? '• توجد مستندات تختلف قيمتها عن إجمالي أطراف قيدها المرحل باليومية (نتيجة تعديل المستند بعد الترحيل أو وجود أطراف ثانوية كالضرائب والخصومات).'
+                        ? (isInvoiceOrReturn 
+                            ? '• سبب الفرق الفعلي: تكرار الصنف داخل بنود المستند أدى إلى تكرار احتساب قيد تكلفة المبيعات وتخفيض المخزون في اليومية العامة بعدد مرات السطور بدلاً من تجميعه مرة واحدة لكل صنف.'
+                            : '• توجد مستندات تختلف قيمتها عن إجمالي أطراف قيدها المرحل باليومية (نتيجة تعديل المستند بعد الترحيل أو وجود أطراف ثانوية كالضرائب والخصومات).')
                         : '• Variances found between document amounts and journal entry lines.'}
                     </p>
-                    <p className="leading-relaxed text-amber-900">
+                    <p className={`leading-relaxed font-black ${isInvoiceOrReturn ? 'text-emerald-800' : 'text-amber-900'}`}>
                       {language === 'ar'
-                        ? '• الإجراء المطلوب: مراجعة المستندات بالجدول أدناه وإعادة مزامنة القيود لتطابق المستندات.'
+                        ? (isInvoiceOrReturn
+                            ? '• الحل الفعلي التلقائي: الضغط أدناه لإعادة تجميع التكلفة وحذف القيود المكررة ومزامنة وتعديل قيود اليومية العامة لتطابق المستندات بنسبة 100% فوراً.'
+                            : '• الإجراء المطلوب: مراجعة المستندات بالجدول أدناه وإعادة مزامنة القيود لتطابق المستندات.')
                         : '• Action: Review items below and resync journal entries.'}
                     </p>
                   </div>
@@ -1562,22 +1586,30 @@ export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, c
                       <th className="p-2.5">{language === 'ar' ? 'الطرف / الصنف' : 'Party / Item'}</th>
                       <th className="p-2.5 text-left">{language === 'ar' ? 'المبلغ' : 'Amount'}</th>
                       <th className="p-2.5">{language === 'ar' ? 'نوع المشكلة' : 'Issue Type'}</th>
-                      <th className="p-2.5">{language === 'ar' ? 'التفاصيل والسبب' : 'Reason / Details'}</th>
+                      <th className="p-2.5">{language === 'ar' ? 'مقدار وتفاصيل الفرق' : 'Variance / Details'}</th>
+                      <th className="p-2.5 text-rose-800">{language === 'ar' ? 'سبب الفرق الفعلي' : 'Root Cause'}</th>
+                      <th className="p-2.5 text-emerald-800">{language === 'ar' ? 'الحل الفعلي المقترح' : 'Actionable Fix'}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-100 font-bold text-stone-700">
                     {selectedItemIssues.issues.map((iss, idx) => (
                       <tr key={idx} className="hover:bg-stone-50">
-                        <td className="p-2.5 font-mono font-black text-stone-900">{iss.document_number}</td>
-                        <td className="p-2.5 font-mono text-stone-500">{iss.date || '—'}</td>
+                        <td className="p-2.5 font-mono font-black text-stone-900 whitespace-nowrap">{iss.document_number}</td>
+                        <td className="p-2.5 font-mono text-stone-500 whitespace-nowrap">{iss.date || '—'}</td>
                         <td className="p-2.5 text-stone-800">{iss.party_name || '—'}</td>
-                        <td className="p-2.5 font-mono text-left">{formatNumber(iss.amount)}</td>
-                        <td className="p-2.5">
+                        <td className="p-2.5 font-mono text-left whitespace-nowrap">{formatNumber(iss.amount)}</td>
+                        <td className="p-2.5 whitespace-nowrap">
                           <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 font-black text-[10px]">
                             {iss.error_type}
                           </span>
                         </td>
-                        <td className="p-2.5 text-stone-600 leading-snug">{iss.details}</td>
+                        <td className="p-2.5 text-stone-600 leading-snug min-w-[200px]">{iss.details}</td>
+                        <td className="p-2.5 text-rose-900 bg-rose-50/50 leading-snug min-w-[180px]">
+                          {iss.root_cause || (language === 'ar' ? 'تكرار أو عدم مطابقة أطراف القيد مع المستند' : 'Journal line variance')}
+                        </td>
+                        <td className="p-2.5 text-emerald-950 bg-emerald-50/50 leading-snug min-w-[180px]">
+                          {iss.suggested_solution || (language === 'ar' ? 'إعادة مزامنة القيد وحذف السطور المكررة وموازنة الأطراف' : 'Resync entry & remove duplicates')}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -1610,12 +1642,14 @@ export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, c
                     btnLabel = language === 'ar' ? 'ترحيل الحركات غير المرحلة فوراً' : 'Post Unposted Transactions';
                   } else if (hasMissingAccounts) {
                     btnLabel = language === 'ar' ? 'ربط الحسابات الناقصة تلقائياً' : 'Auto-Bind Missing Accounts';
+                  } else if (key === 'invoices' || key === 'returns') {
+                    btnLabel = language === 'ar' ? 'إعادة مزامنة القيود وحذف التكرارات فوراً' : 'Resync Entries & Remove Duplicates';
                   }
 
                   return (
                     <button
                       onClick={async () => {
-                        await handleAutoFix();
+                        await handleAutoFix(selectedItemIssues.key);
                         setSelectedItemIssues(null);
                       }}
                       className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-2"

@@ -2,18 +2,50 @@ import { v4 as uuidv4 } from 'uuid';
 export async function syncCOGSForJournalEntry(client: any, companyId: string, journalEntryId: string, referenceId: string, referenceType: string) {
     if (!['invoice', 'return', 'sales_return'].includes(referenceType)) return;
     
-    // 1. Fetch all items for this reference
+    // 1. Fetch all items for this reference GROUPED BY product_id to prevent any duplicate insertion
     let itemsRes;
     if (referenceType === 'invoice') {
-       itemsRes = await client.query('SELECT product_id, quantity, unit_cost as item_cost FROM invoice_items WHERE invoice_id = $1', [referenceId]);
+       itemsRes = await client.query(`
+         SELECT 
+           product_id, 
+           SUM(quantity) as quantity, 
+           SUM(quantity * (CASE WHEN unit_cost = 'NaN'::numeric OR unit_cost IS NULL THEN 0 ELSE unit_cost END)) as total_item_cost
+         FROM invoice_items 
+         WHERE invoice_id = $1 
+         GROUP BY product_id`, 
+         [referenceId]
+       );
     } else {
-       itemsRes = await client.query('SELECT product_id, quantity, unit_cost as item_cost FROM return_items WHERE return_id = $1', [referenceId]);
+       itemsRes = await client.query(`
+         SELECT 
+           product_id, 
+           SUM(quantity) as quantity, 
+           SUM(quantity * (CASE WHEN unit_cost = 'NaN'::numeric OR unit_cost IS NULL THEN 0 ELSE unit_cost END)) as total_item_cost
+         FROM return_items 
+         WHERE return_id = $1 
+         GROUP BY product_id`, 
+         [referenceId]
+       );
     }
 
     if (itemsRes.rows.length === 0) return;
 
     // 2. Clear out any old COGS lines from the journal entry (to keep it idempotent)
-    await client.query("DELETE FROM journal_entry_lines WHERE journal_entry_id = $1 AND (description LIKE '%تكلفة%' OR description LIKE '%تخفيض%' OR description LIKE '%إرجاع%' OR description LIKE '%محدث%')", [journalEntryId]);
+    await client.query(`
+      DELETE FROM journal_entry_lines 
+      WHERE journal_entry_id = $1 
+        AND (
+          description LIKE '%تكلفة%' 
+          OR description LIKE '%تخفيض%' 
+          OR description LIKE '%إرجاع%' 
+          OR description LIKE '%محدث%'
+          OR account_id IN (
+            SELECT id FROM accounts 
+            WHERE company_id = $2 
+              AND (code LIKE '51%' OR code LIKE '1115%' OR account_usage IN ('cost_of_sales', 'cost_of_goods_sold', 'inventory', 'stock'))
+          )
+        )
+    `, [journalEntryId, companyId]);
 
     const isInvoice = referenceType === 'invoice';
     
@@ -36,7 +68,7 @@ export async function syncCOGSForJournalEntry(client: any, companyId: string, jo
         let trueCost = Number(movesRes.rows[0]?.true_cogs) || 0;
         if (trueCost <= 0) {
             // Fall back to estimated cost using invoice item unit_cost if available
-            trueCost = (Number(item.quantity) || 0) * (Number(item.item_cost) || 0);
+            trueCost = Number(item.total_item_cost) || 0;
         }
         if (trueCost <= 0) {
             // Fall back to estimated cost using product.cost_price
