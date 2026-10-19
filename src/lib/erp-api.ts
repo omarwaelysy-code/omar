@@ -2688,12 +2688,15 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
           let actualCounter = 0;
           if (cfg.key === 'invoices') {
             // In sales invoices, legitimate secondary debits are:
-            // 1. Cost of Goods Sold (COGS) from invoice_items (quantity * unit_cost)
+            // 1. Cost of Goods Sold (COGS)
             const cogsRes: any = await client.query(
-              `SELECT COALESCE(SUM(ii.quantity * (CASE WHEN ii.unit_cost = 'NaN'::numeric OR ii.unit_cost IS NULL THEN 0 ELSE ii.unit_cost END)), 0)::numeric as cogs_tot
-               FROM invoice_items ii
-               JOIN invoices i ON i.id = ii.invoice_id
-               WHERE i.company_id = $1`,
+              `SELECT COALESCE(SUM(jel.debit), 0)::numeric as cogs_tot
+               FROM journal_entry_lines jel
+               JOIN accounts a ON a.id = jel.account_id
+               JOIN journal_entries je ON jel.journal_entry_id = je.id
+               WHERE je.company_id = $1 
+                 AND je.reference_type IN ('invoice', 'sales_invoice')
+                 AND (a.account_usage IN ('cost_of_sales', 'cost_of_goods_sold') OR a.code LIKE '51%')`,
               [companyId]
             );
             const docCogs = parseFloat(cogsRes.rows[0]?.cogs_tot || 0);
@@ -2716,38 +2719,59 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
             );
             const docDisc = parseFloat(discRes.rows[0]?.disc_tot || 0);
 
-            // 4. Cash invoice direct settlement debits
+            // 4. Cash invoice direct settlement debits (only if cash leg exists in entry)
             const cashRes: any = await client.query(
-              `SELECT COALESCE(SUM(total_amount * COALESCE(exchange_rate, 1)), 0)::numeric as cash_tot
-               FROM invoices
-               WHERE company_id = $1 AND payment_type = 'cash'`,
+              `SELECT COALESCE(SUM(i.total_amount * COALESCE(i.exchange_rate, 1)), 0)::numeric as cash_tot
+               FROM invoices i
+               JOIN journal_entries je ON (je.reference_id = i.id::text OR je.reference_number = i.invoice_number)
+               JOIN journal_entry_lines jel ON jel.journal_entry_id = je.id
+               JOIN accounts a ON a.id = jel.account_id
+               WHERE i.company_id = $1 AND i.payment_type = 'cash'
+                 AND (a.account_usage IN ('cash', 'bank') OR a.code LIKE '1101%')
+                 AND jel.debit > 0`,
               [companyId]
             );
             const docCash = parseFloat(cashRes.rows[0]?.cash_tot || 0);
 
             actualCounter = docCogs + docWht + docDisc + docCash;
           } else if (cfg.key === 'returns') {
-            // In sales returns, legitimate secondary legs from document items:
+            // In sales returns, legitimate secondary legs:
             // 1. Inventory Restock debit (cost of returned items)
             const cogsRes: any = await client.query(
-              `SELECT COALESCE(SUM(ri.quantity * (CASE WHEN ri.unit_cost = 'NaN'::numeric OR ri.unit_cost IS NULL THEN 0 ELSE ri.unit_cost END)), 0)::numeric as cogs_tot
-               FROM return_items ri
-               JOIN returns r ON r.id = ri.return_id
-               WHERE r.company_id = $1`,
+              `SELECT COALESCE(SUM(jel.debit), 0)::numeric as cogs_tot
+               FROM journal_entry_lines jel
+               JOIN accounts a ON a.id = jel.account_id
+               JOIN journal_entries je ON jel.journal_entry_id = je.id
+               WHERE je.company_id = $1 
+                 AND je.reference_type IN ('return', 'sales_return')
+                 AND (a.account_usage IN ('inventory', 'stock') OR a.code LIKE '1115%')`,
               [companyId]
             );
             const returnCogs = parseFloat(cogsRes.rows[0]?.cogs_tot || 0);
 
-            // 2. Cash settlement debits on cash returns
+            // 2. Cash settlement debits on cash returns (only if cash leg exists in entry)
             const cashRes: any = await client.query(
-              `SELECT COALESCE(SUM(total_amount * COALESCE(exchange_rate, 1)), 0)::numeric as cash_tot
-               FROM returns
-               WHERE company_id = $1 AND (payment_type = 'cash' OR customer_id IS NULL)`,
+              `SELECT COALESCE(SUM(r.total_amount * COALESCE(r.exchange_rate, 1)), 0)::numeric as cash_tot
+               FROM returns r
+               JOIN journal_entries je ON (je.reference_id = r.id::text OR je.reference_number = r.return_number)
+               JOIN journal_entry_lines jel ON jel.journal_entry_id = je.id
+               JOIN accounts a ON a.id = jel.account_id
+               WHERE r.company_id = $1 
+                 AND (a.account_usage IN ('cash', 'bank') OR a.code LIKE '1101%')
+                 AND jel.credit > 0`,
               [companyId]
             );
             const returnCash = parseFloat(cashRes.rows[0]?.cash_tot || 0);
 
-            actualCounter = returnCogs + returnCash;
+            const retWhtRes: any = await client.query(
+              `SELECT COALESCE(SUM(withholding_tax_amount * COALESCE(exchange_rate, 1)), 0)::numeric as wht_tot
+               FROM returns
+               WHERE company_id = $1`,
+              [companyId]
+            );
+            const returnWht = parseFloat(retWhtRes.rows[0]?.wht_tot || 0);
+
+            actualCounter = returnCogs + returnCash + returnWht;
           } else if (cfg.key === 'purchase_invoices') {
             // In purchase invoices, legitimate secondary debits:
             // 1. Supplier settlement debits on cash purchase invoices
@@ -2780,14 +2804,28 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
             actualCounter = suppCashDebits + whtTot + discTot;
           } else if (cfg.key === 'purchase_returns') {
             // In purchase returns, legitimate secondary debits:
-            // Cash / Bank debits on cash purchase returns
+            // 1. Cash / Bank debits on cash purchase returns
             const cashRes: any = await client.query(
               `SELECT COALESCE(SUM(total_amount * COALESCE(exchange_rate, 1)), 0)::numeric as cash_tot
                FROM purchase_returns
                WHERE company_id = $1 AND payment_type = 'cash'`,
               [companyId]
             );
-            actualCounter = parseFloat(cashRes.rows[0]?.cash_tot || 0);
+            const prCash = parseFloat(cashRes.rows[0]?.cash_tot || 0);
+
+            // 2. Discounts and Withholding tax
+            const prSecRes: any = await client.query(
+              `SELECT 
+                 COALESCE(SUM(discount_amount * COALESCE(exchange_rate, 1)), 0)::numeric as disc_tot,
+                 COALESCE(SUM(withholding_tax_amount * COALESCE(exchange_rate, 1)), 0)::numeric as wht_tot
+               FROM purchase_returns
+               WHERE company_id = $1`,
+              [companyId]
+            );
+            const discTot = parseFloat(prSecRes.rows[0]?.disc_tot || 0);
+            const whtTot = parseFloat(prSecRes.rows[0]?.wht_tot || 0);
+
+            actualCounter = prCash + discTot + whtTot;
           } else {
             actualCounter = 0;
           }
@@ -2882,26 +2920,21 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
                    i.id, 
                    i.invoice_number as doc_num, 
                    i.date as doc_date,
-                   ROUND(i.total_amount * COALESCE(i.exchange_rate, 1), 2) as doc_amt,
-                   ROUND(COALESCE(cogs.doc_cost, 0), 2) as doc_cost,
+                   ROUND(ABS(i.total_amount) * COALESCE(i.exchange_rate, 1), 2) as doc_amt,
+                   ROUND(COALESCE(je_cogs.je_cost, 0), 2) as doc_cost,
                    ROUND(
-                     (i.total_amount * COALESCE(i.exchange_rate, 1) * CASE WHEN i.payment_type = 'cash' THEN 2 ELSE 1 END)
-                     + COALESCE(cogs.doc_cost, 0) 
+                     (ABS(i.total_amount) * COALESCE(i.exchange_rate, 1) * CASE WHEN i.payment_type = 'cash' AND EXISTS (SELECT 1 FROM journal_entry_lines jel JOIN accounts a ON a.id = jel.account_id WHERE jel.journal_entry_id = je.id AND (a.account_usage IN ('cash', 'bank') OR a.code LIKE '1101%') AND jel.debit > 0) THEN 2 ELSE 1 END)
+                     + COALESCE(je_cogs.je_cost, 0) 
                      + COALESCE(i.withholding_tax_amount * COALESCE(i.exchange_rate, 1), 0) 
                      + COALESCE(i.discount_amount * COALESCE(i.exchange_rate, 1), 0), 2) as expected_debit,
                    ROUND(COALESCE(je.total_debit, 0), 2) as je_amt,
                    ROUND(COALESCE(je_cogs.je_cost, 0), 2) as je_cogs,
                    COALESCE(cust.name, '') as party
                  FROM invoices i
-                 LEFT JOIN (
-                   SELECT invoice_id, SUM(quantity * (CASE WHEN unit_cost = 'NaN'::numeric OR unit_cost IS NULL THEN 0 ELSE unit_cost END)) as doc_cost
-                   FROM invoice_items
-                   GROUP BY invoice_id
-                 ) cogs ON cogs.invoice_id = i.id
-                 LEFT JOIN customers cust ON cust.id = i.customer_id
                  JOIN journal_entries je ON (je.reference_id = i.id::text OR je.reference_number = i.invoice_number) 
                    AND je.company_id = i.company_id 
                    AND je.reference_type IN ('invoice', 'sales_invoice')
+                 LEFT JOIN customers cust ON cust.id = i.customer_id
                  LEFT JOIN (
                    SELECT jel.journal_entry_id, SUM(jel.debit) as je_cost
                    FROM journal_entry_lines jel
@@ -2911,15 +2944,10 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
                  ) je_cogs ON je_cogs.journal_entry_id = je.id
                  WHERE i.company_id = $1
                    AND ABS(ROUND(COALESCE(je.total_debit, 0) - (
-                     (i.total_amount * COALESCE(i.exchange_rate, 1) * CASE WHEN i.payment_type = 'cash' THEN 2 ELSE 1 END)
-                     + COALESCE(cogs.doc_cost, 0) 
+                     (ABS(i.total_amount) * COALESCE(i.exchange_rate, 1) * CASE WHEN i.payment_type = 'cash' AND EXISTS (SELECT 1 FROM journal_entry_lines jel JOIN accounts a ON a.id = jel.account_id WHERE jel.journal_entry_id = je.id AND (a.account_usage IN ('cash', 'bank') OR a.code LIKE '1101%') AND jel.debit > 0) THEN 2 ELSE 1 END)
+                     + COALESCE(je_cogs.je_cost, 0) 
                      + COALESCE(i.withholding_tax_amount * COALESCE(i.exchange_rate, 1), 0) 
                      + COALESCE(i.discount_amount * COALESCE(i.exchange_rate, 1), 0)), 2)) > 1.0
-                 ORDER BY ABS(ROUND(COALESCE(je.total_debit, 0) - (
-                     (i.total_amount * COALESCE(i.exchange_rate, 1) * CASE WHEN i.payment_type = 'cash' THEN 2 ELSE 1 END)
-                     + COALESCE(cogs.doc_cost, 0) 
-                     + COALESCE(i.withholding_tax_amount * COALESCE(i.exchange_rate, 1), 0) 
-                     + COALESCE(i.discount_amount * COALESCE(i.exchange_rate, 1), 0)), 2)) DESC
                  LIMIT 25`,
                 [companyId]
               );
@@ -2977,27 +3005,31 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
                    r.id, 
                    r.return_number as doc_num, 
                    r.date as doc_date,
-                   ROUND(r.total_amount * COALESCE(r.exchange_rate, 1), 2) as doc_amt,
-                   ROUND(COALESCE(cogs.doc_cost, 0), 2) as doc_cost,
+                   ROUND(ABS(r.total_amount) * COALESCE(r.exchange_rate, 1), 2) as doc_amt,
+                   ROUND(COALESCE(je_cogs.je_cost, 0), 2) as doc_cost,
                    ROUND(
-                     (r.total_amount * COALESCE(r.exchange_rate, 1) * CASE WHEN r.payment_type = 'cash' OR r.customer_id IS NULL THEN 2 ELSE 1 END)
-                     + COALESCE(cogs.doc_cost, 0), 2) as expected_debit,
+                     (ABS(r.total_amount) * COALESCE(r.exchange_rate, 1) * CASE WHEN r.payment_type = 'cash' AND EXISTS (SELECT 1 FROM journal_entry_lines jel JOIN accounts a ON a.id = jel.account_id WHERE jel.journal_entry_id = je.id AND (a.account_usage IN ('cash', 'bank') OR a.code LIKE '1101%') AND jel.credit > 0) THEN 2 ELSE 1 END)
+                     + COALESCE(je_cogs.je_cost, 0)
+                     + COALESCE(r.withholding_tax_amount * COALESCE(r.exchange_rate, 1), 0), 2) as expected_debit,
                    ROUND(COALESCE(je.total_debit, 0), 2) as je_amt,
                    COALESCE(cust.name, '') as party
                  FROM returns r
-                 LEFT JOIN (
-                   SELECT return_id, SUM(quantity * (CASE WHEN unit_cost = 'NaN'::numeric OR unit_cost IS NULL THEN 0 ELSE unit_cost END)) as doc_cost
-                   FROM return_items
-                   GROUP BY return_id
-                 ) cogs ON cogs.return_id = r.id
-                 LEFT JOIN customers cust ON cust.id = r.customer_id
                  JOIN journal_entries je ON (je.reference_id = r.id::text OR je.reference_number = r.return_number) 
                    AND je.company_id = r.company_id 
                    AND je.reference_type IN ('return', 'sales_return')
+                 LEFT JOIN customers cust ON cust.id = r.customer_id
+                 LEFT JOIN (
+                   SELECT jel.journal_entry_id, SUM(jel.debit) as je_cost
+                   FROM journal_entry_lines jel
+                   JOIN accounts a ON a.id = jel.account_id
+                   WHERE a.account_usage IN ('inventory', 'stock') OR a.code LIKE '1115%'
+                   GROUP BY jel.journal_entry_id
+                 ) je_cogs ON je_cogs.journal_entry_id = je.id
                  WHERE r.company_id = $1
                    AND ABS(ROUND(COALESCE(je.total_debit, 0) - (
-                     (r.total_amount * COALESCE(r.exchange_rate, 1) * CASE WHEN r.payment_type = 'cash' OR r.customer_id IS NULL THEN 2 ELSE 1 END)
-                     + COALESCE(cogs.doc_cost, 0)), 2)) > 1.0
+                     (ABS(r.total_amount) * COALESCE(r.exchange_rate, 1) * CASE WHEN r.payment_type = 'cash' AND EXISTS (SELECT 1 FROM journal_entry_lines jel JOIN accounts a ON a.id = jel.account_id WHERE jel.journal_entry_id = je.id AND (a.account_usage IN ('cash', 'bank') OR a.code LIKE '1101%') AND jel.credit > 0) THEN 2 ELSE 1 END)
+                     + COALESCE(je_cogs.je_cost, 0)
+                     + COALESCE(r.withholding_tax_amount * COALESCE(r.exchange_rate, 1), 0)), 2)) > 1.0
                  LIMIT 15`,
                 [companyId]
               );
