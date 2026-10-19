@@ -2715,19 +2715,35 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
             );
             actualCounter = parseFloat(secRes.rows[0]?.sec_tot || 0);
           } else if (cfg.key === 'purchase_invoices') {
-            // In purchase invoices, legitimate secondary debits are cash settlements, WHT, discounts
-            const secRes: any = await client.query(
-              `SELECT COALESCE(SUM(jel.debit), 0)::numeric as sec_tot
-               FROM journal_entry_lines jel
-               JOIN accounts a ON a.id = jel.account_id
-               JOIN journal_entries je ON jel.journal_entry_id = je.id
-               WHERE je.company_id = $1 
-                 AND je.reference_type IN ('purchase_invoice')
-                 AND NOT (a.code LIKE '1115%' OR a.account_usage IN ('inventory', 'stock') OR a.code LIKE '2221%')
-                 AND NOT (je.reference_number LIKE 'REV-%' OR je.entry_number LIKE 'REV-%' OR je.description LIKE '%عكس%')`,
+            // In purchase invoices, legitimate secondary additions:
+            // 1. Supplier settlement debits on cash purchase invoices
+            const cashRes: any = await client.query(
+              `SELECT COALESCE(SUM(total_amount * COALESCE(exchange_rate, 1)), 0)::numeric as cash_tot
+               FROM purchase_invoices
+               WHERE company_id = $1 AND payment_type = 'cash'`,
               [companyId]
             );
-            actualCounter = parseFloat(secRes.rows[0]?.sec_tot || 0);
+            const suppCashDebits = parseFloat(cashRes.rows[0]?.cash_tot || 0);
+
+            // 2. Withholding tax
+            const whtRes: any = await client.query(
+              `SELECT COALESCE(SUM(withholding_tax_amount * COALESCE(exchange_rate, 1)), 0)::numeric as wht_tot
+               FROM purchase_invoices
+               WHERE company_id = $1`,
+              [companyId]
+            );
+            const whtTot = parseFloat(whtRes.rows[0]?.wht_tot || 0);
+
+            // 3. Purchase discounts
+            const discRes: any = await client.query(
+              `SELECT COALESCE(SUM(discount_amount * COALESCE(exchange_rate, 1)), 0)::numeric as disc_tot
+               FROM purchase_invoices
+               WHERE company_id = $1`,
+              [companyId]
+            );
+            const discTot = parseFloat(discRes.rows[0]?.disc_tot || 0);
+
+            actualCounter = suppCashDebits + whtTot + discTot;
           } else if (cfg.key === 'purchase_returns') {
             // In purchase returns, legitimate secondary debits are Withholding taxes, discounts, and cash receipts
             const secRes: any = await client.query(
