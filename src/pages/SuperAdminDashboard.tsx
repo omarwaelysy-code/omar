@@ -1012,16 +1012,17 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
             <table className="w-full text-right">
               <thead className="bg-stone-50 border-b border-stone-200/80">
                 <tr>
-                  <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">الشركة</th>
-                  <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">الكود</th>
-                  <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">الحالة</th>
-                  <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">آخر نشاط</th>
-                  <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">تاريخ الإنشاء</th>
-                  <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">بداية الاشتراك</th>
-                  <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">انتهاء الاشتراك</th>
-                  <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">عدد المستخدمين</th>
-                  <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">حجم البيانات المخزنة</th>
-                  <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider text-left">الإجراءات</th>
+                  <th className="px-2 py-1.5 text-[11px] font-bold text-stone-500 uppercase tracking-wider">الشركة</th>
+                  <th className="px-2 py-1.5 text-[11px] font-bold text-stone-500 uppercase tracking-wider">الكود</th>
+                  <th className="px-2 py-1.5 text-[11px] font-bold text-stone-500 uppercase tracking-wider">الحالة</th>
+                  <th className="px-2 py-1.5 text-[11px] font-bold text-stone-500 uppercase tracking-wider">آخر نشاط</th>
+                  <th className="px-2 py-1.5 text-[11px] font-bold text-stone-500 uppercase tracking-wider">منذ</th>
+                  <th className="px-2 py-1.5 text-[11px] font-bold text-stone-500 uppercase tracking-wider">تاريخ الإنشاء</th>
+                  <th className="px-2 py-1.5 text-[11px] font-bold text-stone-500 uppercase tracking-wider">بداية الاشتراك</th>
+                  <th className="px-2 py-1.5 text-[11px] font-bold text-stone-500 uppercase tracking-wider">انتهاء الاشتراك</th>
+                  <th className="px-2 py-1.5 text-[11px] font-bold text-stone-500 uppercase tracking-wider">عدد المستخدمين</th>
+                  <th className="px-2 py-1.5 text-[11px] font-bold text-stone-500 uppercase tracking-wider">حجم البيانات المخزنة</th>
+                  <th className="px-2 py-1.5 text-[11px] font-bold text-stone-500 uppercase tracking-wider text-left">الإجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
@@ -1064,12 +1065,12 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                           );
                         })()}
                       </td>
-                      <td className="px-3 py-1.5 whitespace-nowrap">
+                      <td className="px-2 py-1 whitespace-nowrap">
                         {(() => {
                           const lastAct = (company as any).last_activity_at;
                           if (!lastAct) {
                             return (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-stone-100 text-stone-500 border border-stone-200 text-[10px] font-bold">
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-stone-100 text-stone-500 border border-stone-200 text-[10px] font-bold">
                                 <Clock className="w-3 h-3 text-stone-400" />
                                 <span>لا يوجد نشاط</span>
                               </span>
@@ -1079,11 +1080,50 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                           const datePart = d.toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
                           const timePart = d.toLocaleTimeString('ar-EG', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit' });
                           return (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold font-mono">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold font-mono">
                               <Clock className="w-3 h-3 text-emerald-600" />
                               <span dir="ltr">{datePart}</span>
                               <span className="opacity-40">|</span>
                               <span>{timePart}</span>
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-2 py-1 whitespace-nowrap">
+                        {(() => {
+                          const lastAct = (company as any).last_activity_at;
+                          if (!lastAct) {
+                            return (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-stone-100 text-stone-400 border border-stone-200 text-[10px] font-bold">
+                                غير نشط
+                              </span>
+                            );
+                          }
+                          const d = new Date(lastAct);
+                          const diffMs = Date.now() - d.getTime();
+                          const diffHours = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
+                          const diffDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+                          let label = '';
+                          let cls = '';
+                          if (diffHours < 1) {
+                            label = 'نشط الآن';
+                            cls = 'bg-emerald-50 text-emerald-800 border-emerald-200';
+                          } else if (diffHours < 24) {
+                            label = `نشط اليوم (منذ ${diffHours} س)`;
+                            cls = 'bg-emerald-50 text-emerald-800 border-emerald-200';
+                          } else if (diffDays <= 7) {
+                            label = `نشط (منذ ${diffDays} يوم)`;
+                            cls = 'bg-teal-50 text-teal-800 border-teal-200';
+                          } else if (diffDays <= 30) {
+                            label = `منذ ${diffDays} يوم`;
+                            cls = 'bg-amber-50 text-amber-800 border-amber-200';
+                          } else {
+                            label = `خامل منذ ${diffDays} يوم`;
+                            cls = 'bg-rose-50 text-rose-800 border-rose-200';
+                          }
+                          return (
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md border text-[10px] font-bold ${cls}`}>
+                              {label}
                             </span>
                           );
                         })()}

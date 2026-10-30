@@ -412,24 +412,26 @@ export const MonitoringAuditTab: React.FC<MonitoringAuditTabProps> = ({ companie
             <table className="w-full text-right border-collapse">
               <thead>
                 <tr className="bg-stone-100/80 border-b border-stone-200 text-stone-600 text-[10px] font-black uppercase tracking-tight">
-                  <th className="px-2 py-1.5">كود الشركة</th>
-                  <th className="px-2.5 py-1.5">اسم الشركة</th>
-                  <th className="px-2 py-1.5 text-center">الحالة</th>
-                  <th className="px-2 py-1.5 text-center">آخر نشاط (التاريخ والوقت)</th>
-                  <th className="px-2 py-1.5 text-center">العملة</th>
-                  <th className="px-2 py-1.5 text-center">حركات مقيدة</th>
-                  <th className="px-2 py-1.5 text-center">قيمة المقيد</th>
-                  <th className="px-2 py-1.5 text-center">عمليات (عدد)</th>
-                  <th className="px-2 py-1.5 text-center">قيمة العمليات</th>
-                  <th className="px-2 py-1.5 text-center">حركات بدون قيود</th>
-                  <th className="px-2 py-1.5 text-center">البيانات الأساسية</th>
-                  <th className="px-2 py-1.5 text-center">سلامة الحسابات والتوازن</th>
-                  <th className="px-2 py-1.5 text-center">التقارير والمركز المالي</th>
-                  <th className="px-1.5 py-1.5 text-center">التدقيق</th>
+                  <th className="px-1 py-1 whitespace-nowrap">كود الشركة</th>
+                  <th className="px-1.5 py-1 whitespace-nowrap">اسم الشركة</th>
+                  <th className="px-1 py-1 text-center whitespace-nowrap">الحالة</th>
+                  <th className="px-1 py-1 text-center whitespace-nowrap">آخر نشاط (التاريخ والوقت)</th>
+                  <th className="px-1 py-1 text-center whitespace-nowrap">منذ</th>
+                  <th className="px-1 py-1 text-center whitespace-nowrap">العملة</th>
+                  <th className="px-1 py-1 text-center whitespace-nowrap">حركات مقيدة</th>
+                  <th className="px-1 py-1 text-center whitespace-nowrap">قيمة المقيد</th>
+                  <th className="px-1 py-1 text-center whitespace-nowrap">عمليات (عدد)</th>
+                  <th className="px-1 py-1 text-center whitespace-nowrap">قيمة العمليات</th>
+                  <th className="px-1 py-1 text-center whitespace-nowrap">حركات بدون قيود</th>
+                  <th className="px-1 py-1 text-center whitespace-nowrap">البيانات الأساسية</th>
+                  <th className="px-1 py-1 text-center whitespace-nowrap">سلامة الحسابات والتوازن</th>
+                  <th className="px-1 py-1 text-center whitespace-nowrap">التقارير والمركز المالي</th>
+                  <th className="px-1 py-1 text-center whitespace-nowrap">التدقيق</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 text-[11px]">
                 {filteredRows.map((comp) => {
+                  const actInfo = formatLastActivityInfo(comp.last_activity_at);
                   return (
                     <tr
                       key={comp.id}
@@ -438,27 +440,27 @@ export const MonitoringAuditTab: React.FC<MonitoringAuditTabProps> = ({ companie
                       title="اضغط لفتح شاشة التدقيق الشامل لهذه الشركة"
                     >
                       {/* 1. كود الشركة */}
-                      <td className="px-2 py-1.5 whitespace-nowrap">
-                        <span className="font-mono font-bold text-stone-700 bg-stone-100 group-hover:bg-white group-hover:border-emerald-300 border border-stone-200 px-2 py-0.5 rounded-lg text-[10px] transition-colors">
+                      <td className="px-1 py-0.5 whitespace-nowrap">
+                        <span className="font-mono font-bold text-stone-700 bg-stone-100 group-hover:bg-white group-hover:border-emerald-300 border border-stone-200 px-1.5 py-0.2 rounded-md text-[10px] transition-colors">
                           {comp.code}
                         </span>
                       </td>
 
                       {/* 2. اسم الشركة */}
-                      <td className="px-2.5 py-1.5 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-6 h-6 rounded-lg bg-stone-100 group-hover:bg-emerald-100 text-stone-600 group-hover:text-emerald-700 flex items-center justify-center shrink-0 transition-colors">
-                            <Building2 size={12} />
+                      <td className="px-1.5 py-0.5 whitespace-nowrap">
+                        <div className="flex items-center gap-1">
+                          <div className="w-5 h-5 rounded-md bg-stone-100 group-hover:bg-emerald-100 text-stone-600 group-hover:text-emerald-700 flex items-center justify-center shrink-0 transition-colors">
+                            <Building2 size={11} />
                           </div>
-                          <div className="font-bold text-stone-900 group-hover:text-emerald-950 transition-colors leading-tight text-xs">
+                          <div className="font-bold text-stone-900 group-hover:text-emerald-950 transition-colors leading-tight text-[11px]">
                             {comp.name}
                           </div>
                         </div>
                       </td>
 
                       {/* 3. الحالة */}
-                      <td className="px-2 py-1.5 whitespace-nowrap text-center">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      <td className="px-1 py-0.5 whitespace-nowrap text-center">
+                        <span className={`inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
                           comp.company_status === 'active' || !comp.company_status 
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
                             : 'bg-stone-100 text-stone-600 border border-stone-200'
@@ -468,100 +470,102 @@ export const MonitoringAuditTab: React.FC<MonitoringAuditTabProps> = ({ companie
                       </td>
 
                       {/* 3.5. آخر نشاط (التاريخ والوقت) */}
-                      <td className="px-2 py-1.5 whitespace-nowrap text-center">
-                        {(() => {
-                          const actInfo = formatLastActivityInfo(comp.last_activity_at);
-                          if (!actInfo) {
-                            return (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-stone-100 border border-stone-200 text-stone-500 text-[10px] font-bold">
-                                <Clock size={11} className="text-stone-400" />
-                                <span>لا يوجد نشاط</span>
-                              </span>
-                            );
-                          }
-                          return (
-                            <div className="inline-flex flex-col items-center justify-center gap-0.5">
-                              <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[10px] font-bold font-mono ${actInfo.badgeClass}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${actInfo.dotClass}`} />
-                                <span dir="ltr">{actInfo.dateFormatted}</span>
-                                <span className="opacity-40">|</span>
-                                <span>{actInfo.timeFormatted}</span>
-                              </div>
-                              <span className="text-[9px] font-bold text-stone-500 leading-none">
-                                {actInfo.relativeLabel}
-                              </span>
-                            </div>
-                          );
-                        })()}
+                      <td className="px-1 py-0.5 whitespace-nowrap text-center">
+                        {!actInfo ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-md bg-stone-100 border border-stone-200 text-stone-500 text-[10px] font-bold">
+                            <Clock size={10} className="text-stone-400" />
+                            <span>لا يوجد نشاط</span>
+                          </span>
+                        ) : (
+                          <div className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded-md border text-[10px] font-bold font-mono ${actInfo.badgeClass}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${actInfo.dotClass}`} />
+                            <span dir="ltr">{actInfo.dateFormatted}</span>
+                            <span className="opacity-40">|</span>
+                            <span>{actInfo.timeFormatted}</span>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* 3.6. منذ */}
+                      <td className="px-1 py-0.5 whitespace-nowrap text-center">
+                        {!actInfo ? (
+                          <span className="inline-flex items-center px-1.5 py-0.2 rounded-md bg-stone-100 border border-stone-200 text-stone-400 text-[10px] font-bold">
+                            غير نشط
+                          </span>
+                        ) : (
+                          <span className={`inline-flex items-center px-1.5 py-0.2 rounded-md border text-[10px] font-bold ${actInfo.badgeClass}`}>
+                            {actInfo.relativeLabel}
+                          </span>
+                        )}
                       </td>
 
                       {/* 4. العملة */}
-                      <td className="px-2 py-1.5 whitespace-nowrap text-center">
-                        <span className="font-mono font-bold text-stone-700 bg-stone-100 px-2 py-0.5 rounded-lg text-[10px] border border-stone-200">
+                      <td className="px-1 py-0.5 whitespace-nowrap text-center">
+                        <span className="font-mono font-bold text-stone-700 bg-stone-100 px-1.5 py-0.2 rounded-md text-[10px] border border-stone-200">
                           {comp.currency || 'EGP'}
                         </span>
                       </td>
 
                       {/* 5. الحركات المقيدة (عدد) */}
-                      <td className="px-2 py-1.5 whitespace-nowrap text-center">
-                        <span className="font-bold text-stone-900 font-mono">
+                      <td className="px-1 py-0.5 whitespace-nowrap text-center">
+                        <span className="font-bold text-stone-900 font-mono text-[10px]">
                           {formatNumber(comp.posting_count)}
                         </span>
                       </td>
 
                       {/* 6. قيمة المقيد */}
-                      <td className="px-2 py-1.5 whitespace-nowrap text-center">
+                      <td className="px-1 py-0.5 whitespace-nowrap text-center">
                         <span className="font-mono font-bold text-emerald-700 text-[10px]">
                           {formatNumber(comp.posting_value)}
                         </span>
                       </td>
 
                       {/* 7. العمليات غير المقيدة (عدد) */}
-                      <td className="px-2 py-1.5 whitespace-nowrap text-center">
-                        <span className="font-bold text-stone-900 font-mono">
+                      <td className="px-1 py-0.5 whitespace-nowrap text-center">
+                        <span className="font-bold text-stone-900 font-mono text-[10px]">
                           {formatNumber(comp.operational_count)}
                         </span>
                       </td>
 
                       {/* 8. قيمة العمليات */}
-                      <td className="px-2 py-1.5 whitespace-nowrap text-center">
+                      <td className="px-1 py-0.5 whitespace-nowrap text-center">
                         <span className="font-mono font-bold text-blue-700 text-[10px]">
                           {formatNumber(comp.operational_value)}
                         </span>
                       </td>
 
                       {/* 9. حركات بدون قيود مرحلة */}
-                      <td className="px-2 py-1.5 whitespace-nowrap text-center">
+                      <td className="px-1 py-0.5 whitespace-nowrap text-center">
                         {comp.unposted_count === 0 ? (
-                          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50/70 border border-amber-200/80 text-amber-800 text-[10px] font-black">
+                          <div className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-md bg-amber-50/70 border border-amber-200/80 text-amber-800 text-[10px] font-black">
                             <span>0.00</span>
                             <span className="text-[9px] font-bold text-amber-700">(جميعها مرحلة)</span>
                           </div>
                         ) : (
-                          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-[10px] font-black">
-                            <AlertTriangle size={11} className="text-rose-600" />
+                          <div className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-md bg-rose-50 border border-rose-200 text-rose-800 text-[10px] font-black">
+                            <AlertTriangle size={10} className="text-rose-600" />
                             <span>{formatNumber(comp.unposted_count)} غير مرحل</span>
                           </div>
                         )}
                       </td>
 
                       {/* 10. البيانات الأساسية */}
-                      <td className="px-2 py-1.5 whitespace-nowrap text-center">
-                        <span className="font-bold text-stone-700 bg-stone-100 px-2 py-0.5 rounded-lg font-mono text-[10px]">
+                      <td className="px-1 py-0.5 whitespace-nowrap text-center">
+                        <span className="font-bold text-stone-700 bg-stone-100 px-1.5 py-0.2 rounded-md font-mono text-[10px]">
                           {formatNumber(comp.master_count)}
                         </span>
                       </td>
 
-                      {/* 9. سلامة الحسابات والتوازن */}
-                      <td className="px-2 py-1.5 whitespace-nowrap text-center">
+                      {/* 11. سلامة الحسابات والتوازن */}
+                      <td className="px-1 py-0.5 whitespace-nowrap text-center">
                         {comp.unbalanced_count === 0 && comp.missing_accounts_count === 0 ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-black">
-                            <ShieldCheck size={11} className="text-emerald-600" />
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-black">
+                            <ShieldCheck size={10} className="text-emerald-600" />
                             <span>سليم ومتزن 100%</span>
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-800 text-[9px] font-black">
-                            <XCircle size={11} className="text-rose-600" />
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full bg-rose-50 border border-rose-200 text-rose-800 text-[9px] font-black">
+                            <XCircle size={10} className="text-rose-600" />
                             <span>
                               {comp.missing_accounts_count > 0 ? `${comp.missing_accounts_count} ناقص ` : ''}
                               {comp.unbalanced_count > 0 ? `${comp.unbalanced_count} غير متزن` : ''}
@@ -570,24 +574,24 @@ export const MonitoringAuditTab: React.FC<MonitoringAuditTabProps> = ({ companie
                         )}
                       </td>
 
-                      {/* 10. التقارير والمركز المالي */}
-                      <td className="px-2 py-1.5 whitespace-nowrap text-center">
+                      {/* 12. التقارير والمركز المالي */}
+                      <td className="px-1 py-0.5 whitespace-nowrap text-center">
                         {comp.reports_discrepancies === 0 ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-900 text-[10px] font-black">
-                            <Scale size={11} className="text-indigo-600" />
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-900 text-[10px] font-black">
+                            <Scale size={10} className="text-indigo-600" />
                             <span>مطابقة تامة 100%</span>
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-800 text-[9px] font-black">
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full bg-rose-50 border border-rose-200 text-rose-800 text-[9px] font-black">
                             <span>{comp.reports_discrepancies} فرق بحاجة لمراجعة</span>
                           </span>
                         )}
                       </td>
 
-                      {/* 11. Action Arrow */}
-                      <td className="px-1.5 py-1.5 text-center whitespace-nowrap">
-                        <div className="w-6 h-6 rounded-lg bg-stone-100 group-hover:bg-emerald-600 group-hover:text-white text-stone-500 flex items-center justify-center mx-auto transition-all shadow-2xs">
-                          <ChevronLeft size={13} />
+                      {/* 13. Action Arrow */}
+                      <td className="px-1 py-0.5 text-center whitespace-nowrap">
+                        <div className="w-5 h-5 rounded-md bg-stone-100 group-hover:bg-emerald-600 group-hover:text-white text-stone-500 flex items-center justify-center mx-auto transition-all shadow-2xs">
+                          <ChevronLeft size={12} />
                         </div>
                       </td>
                     </tr>
