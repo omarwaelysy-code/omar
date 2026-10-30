@@ -15,7 +15,8 @@ import {
   ExternalLink,
   Activity,
   ChevronLeft,
-  AlertCircle
+  AlertCircle,
+  Clock
 } from 'lucide-react';
 import { formatNumber } from '../../utils/formatUtils';
 import { DataCountsValues } from '../../pages/DataCountsValues';
@@ -26,6 +27,7 @@ export interface CompanyAuditOverview {
   code: string;
   company_status?: string;
   currency?: string;
+  last_activity_at?: string | null;
   posting_count: number;
   posting_value: number;
   operational_count: number;
@@ -36,6 +38,57 @@ export interface CompanyAuditOverview {
   master_count: number;
   reports_discrepancies: number;
 }
+
+const formatLastActivityInfo = (dateStr?: string | null) => {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+
+  const dateFormatted = d.toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
+  const timeFormatted = d.toLocaleTimeString('ar-EG', {
+    timeZone: 'Africa/Cairo',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const diffMs = Date.now() - d.getTime();
+  const diffHours = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
+  const diffDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+
+  let relativeLabel = '';
+  let badgeClass = '';
+  let dotClass = '';
+
+  if (diffHours < 1) {
+    relativeLabel = 'نشط الآن';
+    badgeClass = 'bg-emerald-50 text-emerald-800 border-emerald-200';
+    dotClass = 'bg-emerald-500 animate-pulse';
+  } else if (diffHours < 24) {
+    relativeLabel = `نشط اليوم (منذ ${diffHours} س)`;
+    badgeClass = 'bg-emerald-50 text-emerald-800 border-emerald-200';
+    dotClass = 'bg-emerald-500';
+  } else if (diffDays <= 7) {
+    relativeLabel = `نشط (منذ ${diffDays} يوم)`;
+    badgeClass = 'bg-teal-50 text-teal-800 border-teal-200';
+    dotClass = 'bg-teal-500';
+  } else if (diffDays <= 30) {
+    relativeLabel = `منذ ${diffDays} يوم`;
+    badgeClass = 'bg-amber-50 text-amber-800 border-amber-200';
+    dotClass = 'bg-amber-500';
+  } else {
+    relativeLabel = `خامل منذ ${diffDays} يوم`;
+    badgeClass = 'bg-rose-50 text-rose-800 border-rose-200';
+    dotClass = 'bg-rose-500';
+  }
+
+  return {
+    dateFormatted,
+    timeFormatted,
+    relativeLabel,
+    badgeClass,
+    dotClass
+  };
+};
 
 interface MonitoringAuditTabProps {
   companies: Company[];
@@ -362,6 +415,7 @@ export const MonitoringAuditTab: React.FC<MonitoringAuditTabProps> = ({ companie
                   <th className="px-2 py-1.5">كود الشركة</th>
                   <th className="px-2.5 py-1.5">اسم الشركة</th>
                   <th className="px-2 py-1.5 text-center">الحالة</th>
+                  <th className="px-2 py-1.5 text-center">آخر نشاط (التاريخ والوقت)</th>
                   <th className="px-2 py-1.5 text-center">العملة</th>
                   <th className="px-2 py-1.5 text-center">حركات مقيدة</th>
                   <th className="px-2 py-1.5 text-center">قيمة المقيد</th>
@@ -411,6 +465,34 @@ export const MonitoringAuditTab: React.FC<MonitoringAuditTabProps> = ({ companie
                         }`}>
                           {comp.company_status === 'active' || !comp.company_status ? 'نشط' : 'معطل'}
                         </span>
+                      </td>
+
+                      {/* 3.5. آخر نشاط (التاريخ والوقت) */}
+                      <td className="px-2 py-1.5 whitespace-nowrap text-center">
+                        {(() => {
+                          const actInfo = formatLastActivityInfo(comp.last_activity_at);
+                          if (!actInfo) {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-stone-100 border border-stone-200 text-stone-500 text-[10px] font-bold">
+                                <Clock size={11} className="text-stone-400" />
+                                <span>لا يوجد نشاط</span>
+                              </span>
+                            );
+                          }
+                          return (
+                            <div className="inline-flex flex-col items-center justify-center gap-0.5">
+                              <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[10px] font-bold font-mono ${actInfo.badgeClass}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${actInfo.dotClass}`} />
+                                <span dir="ltr">{actInfo.dateFormatted}</span>
+                                <span className="opacity-40">|</span>
+                                <span>{actInfo.timeFormatted}</span>
+                              </div>
+                              <span className="text-[9px] font-bold text-stone-500 leading-none">
+                                {actInfo.relativeLabel}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* 4. العملة */}

@@ -3491,16 +3491,125 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
   }
 });
 
+// Helper to compute the latest activity timestamp per company across all operational, financial, master, and user activity tables
+async function getCompaniesLastActivityMap(dbClient: any): Promise<Record<string, string>> {
+  const activityMap: Record<string, string> = {};
+  try {
+    const actRes = await dbClient.query(`
+      WITH company_activities AS (
+        SELECT company_id, GREATEST(MAX(created_at), MAX(updated_at)) AS last_ts
+        FROM invoices WHERE company_id IS NOT NULL GROUP BY company_id
+        UNION ALL
+        SELECT company_id, MAX(created_at) AS last_ts
+        FROM purchase_invoices WHERE company_id IS NOT NULL GROUP BY company_id
+        UNION ALL
+        SELECT company_id, MAX(created_at) AS last_ts
+        FROM returns WHERE company_id IS NOT NULL GROUP BY company_id
+        UNION ALL
+        SELECT company_id, MAX(created_at) AS last_ts
+        FROM purchase_returns WHERE company_id IS NOT NULL GROUP BY company_id
+        UNION ALL
+        SELECT company_id, MAX(created_at) AS last_ts
+        FROM receipt_vouchers WHERE company_id IS NOT NULL GROUP BY company_id
+        UNION ALL
+        SELECT company_id, MAX(created_at) AS last_ts
+        FROM payment_vouchers WHERE company_id IS NOT NULL GROUP BY company_id
+        UNION ALL
+        SELECT company_id, MAX(created_at) AS last_ts
+        FROM journal_entries WHERE company_id IS NOT NULL GROUP BY company_id
+        UNION ALL
+        SELECT company_id, GREATEST(MAX(created_at), MAX(updated_at)) AS last_ts
+        FROM issued_cheques WHERE company_id IS NOT NULL GROUP BY company_id
+        UNION ALL
+        SELECT company_id, GREATEST(MAX(created_at), MAX(updated_at)) AS last_ts
+        FROM received_cheques WHERE company_id IS NOT NULL GROUP BY company_id
+        UNION ALL
+        SELECT company_id, MAX(created_at) AS last_ts
+        FROM cash_transfers WHERE company_id IS NOT NULL GROUP BY company_id
+        UNION ALL
+        SELECT company_id, MAX(created_at) AS last_ts
+        FROM warehouse_transfers WHERE company_id IS NOT NULL GROUP BY company_id
+        UNION ALL
+        SELECT company_id, MAX(created_at) AS last_ts
+        FROM opening_stock_balances WHERE company_id IS NOT NULL GROUP BY company_id
+        UNION ALL
+        SELECT company_id, MAX(created_at) AS last_ts
+        FROM stock_adjustments WHERE company_id IS NOT NULL GROUP BY company_id
+        UNION ALL
+        SELECT company_id, MAX(created_at) AS last_ts
+        FROM inventory_movements WHERE company_id IS NOT NULL GROUP BY company_id
+        UNION ALL
+        SELECT company_id, MAX(created_at) AS last_ts
+        FROM operations WHERE company_id IS NOT NULL GROUP BY company_id
+        UNION ALL
+        SELECT company_id, MAX(created_at) AS last_ts
+        FROM customers WHERE company_id IS NOT NULL GROUP BY company_id
+        UNION ALL
+        SELECT company_id, MAX(created_at) AS last_ts
+        FROM suppliers WHERE company_id IS NOT NULL GROUP BY company_id
+        UNION ALL
+        SELECT company_id, MAX(created_at) AS last_ts
+        FROM products WHERE company_id IS NOT NULL GROUP BY company_id
+        UNION ALL
+        SELECT company_id, MAX(created_at) AS last_ts
+        FROM warehouses WHERE company_id IS NOT NULL GROUP BY company_id
+        UNION ALL
+        SELECT company_id, MAX(created_at) AS last_ts
+        FROM item_groups WHERE company_id IS NOT NULL GROUP BY company_id
+        UNION ALL
+        SELECT company_id, MAX(created_at) AS last_ts
+        FROM activity_logs
+        WHERE company_id IS NOT NULL
+          AND COALESCE(action, '') NOT IN (
+            'إضافة شركة جديدة', 'تعديل بيانات شركة', 'تعديل مدير الشركة',
+            'إعادة تعيين كلمة المرور', 'إعادة إرسال بريد الترحيب',
+            'COMPANIES:CREATE', 'COMPANIES:UPDATE', 'AUTH:CREATE', 'AUTH:REGISTER',
+            'USERS:CREATE', 'USERS:UPDATE', 'إضافة مستخدم', 'حذف مستخدم'
+          )
+          AND (user_id IS NULL OR user_id NOT IN (
+            SELECT id FROM users WHERE role = 'super_admin' OR company_id IN ('system', 'SYSTEM')
+          ))
+        GROUP BY company_id
+        UNION ALL
+        SELECT company_id, MAX(created_at) AS last_ts
+        FROM audit_logs
+        WHERE company_id IS NOT NULL
+          AND COALESCE(module, '') NOT IN ('COMPANIES', 'SUBSCRIPTIONS', 'USERS')
+          AND NOT (COALESCE(module, '') = 'AUTH' AND COALESCE(action, '') IN ('CREATE', 'REGISTER'))
+          AND (user_id IS NULL OR user_id NOT IN (
+            SELECT id FROM users WHERE role = 'super_admin' OR company_id IN ('system', 'SYSTEM')
+          ))
+        GROUP BY company_id
+      )
+      SELECT company_id, MAX(last_ts) AS last_activity_at
+      FROM company_activities
+      WHERE last_ts IS NOT NULL
+      GROUP BY company_id
+    `);
+    for (const r of actRes.rows) {
+      if (r.company_id && r.last_activity_at) {
+        activityMap[r.company_id] = new Date(r.last_activity_at).toISOString();
+      }
+    }
+  } catch (err) {
+    console.warn('[LAST-ACTIVITY] Could not compute company last activity:', err);
+  }
+  return activityMap;
+}
+
 // Multi-company Audit Overview for Super Admin Monitoring
 router.get('/system/companies-audit-overview', authenticateToken, authorizeRoles('super_admin'), async (req: AuthRequest, res) => {
   const client = await pool.connect();
   try {
-    const compRes = await client.query(`
-      SELECT id, name, code, company_status, COALESCE(currency, 'EGP') as currency 
-      FROM companies 
-      WHERE id != 'SYSTEM' 
-      ORDER BY name ASC
-    `);
+    const [compRes, lastActivityMap] = await Promise.all([
+      client.query(`
+        SELECT id, name, code, company_status, COALESCE(currency, 'EGP') as currency 
+        FROM companies 
+        WHERE id != 'SYSTEM' 
+        ORDER BY name ASC
+      `),
+      getCompaniesLastActivityMap(client)
+    ]);
 
     const summaries = [];
     for (const comp of compRes.rows) {
@@ -3526,6 +3635,7 @@ router.get('/system/companies-audit-overview', authenticateToken, authorizeRoles
           code: comp.code || '-',
           company_status: comp.company_status,
           currency: comp.currency || 'EGP',
+          last_activity_at: lastActivityMap[comp.id] || null,
           posting_count: totalPostingCount,
           posting_value: totalPostingValue,
           operational_count: totalOperationalCount,
@@ -3544,6 +3654,7 @@ router.get('/system/companies-audit-overview', authenticateToken, authorizeRoles
           code: comp.code || '-',
           company_status: comp.company_status,
           currency: comp.currency || 'EGP',
+          last_activity_at: lastActivityMap[comp.id] || null,
           posting_count: 0,
           posting_value: 0,
           operational_count: 0,
@@ -8605,9 +8716,10 @@ modules.forEach(moduleName => {
               sizeMap[r.company_id] = parseInt(r.total_bytes, 10);
             }
 
-            const usersRes = await pool.query(
-              `SELECT company_id, COUNT(*) as count FROM users WHERE company_id IS NOT NULL GROUP BY company_id`
-            );
+            const [usersRes, lastActivityMap] = await Promise.all([
+              pool.query(`SELECT company_id, COUNT(*) as count FROM users WHERE company_id IS NOT NULL GROUP BY company_id`),
+              getCompaniesLastActivityMap(pool)
+            ]);
             const usersMap: Record<string, number> = {};
             for (const r of usersRes.rows) {
               usersMap[r.company_id] = parseInt(r.count, 10);
@@ -8628,6 +8740,7 @@ modules.forEach(moduleName => {
               }
 
               row.active_users_count = usersMap[row.id] || 0;
+              row.last_activity_at = lastActivityMap[row.id] || null;
             }
           } catch (e) {
             console.error('Error computing company storage sizes:', e);

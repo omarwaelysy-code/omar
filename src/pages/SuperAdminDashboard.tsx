@@ -1015,6 +1015,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                   <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">الشركة</th>
                   <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">الكود</th>
                   <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">الحالة</th>
+                  <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">آخر نشاط</th>
                   <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">تاريخ الإنشاء</th>
                   <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">بداية الاشتراك</th>
                   <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">انتهاء الاشتراك</th>
@@ -1059,6 +1060,30 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${status.color}`}>
                               <StatusIcon className="w-3 h-3" />
                               <span>{status.label}</span>
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-3 py-1.5 whitespace-nowrap">
+                        {(() => {
+                          const lastAct = (company as any).last_activity_at;
+                          if (!lastAct) {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-stone-100 text-stone-500 border border-stone-200 text-[10px] font-bold">
+                                <Clock className="w-3 h-3 text-stone-400" />
+                                <span>لا يوجد نشاط</span>
+                              </span>
+                            );
+                          }
+                          const d = new Date(lastAct);
+                          const datePart = d.toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
+                          const timePart = d.toLocaleTimeString('ar-EG', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit' });
+                          return (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold font-mono">
+                              <Clock className="w-3 h-3 text-emerald-600" />
+                              <span dir="ltr">{datePart}</span>
+                              <span className="opacity-40">|</span>
+                              <span>{timePart}</span>
                             </span>
                           );
                         })()}
