@@ -49,6 +49,8 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
   const [importError, setImportError] = useState('');
   const [showOnlyErrors, setShowOnlyErrors] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [sampleCount, setSampleCount] = useState<number>(500);
+  const [loadingSample, setLoadingSample] = useState(false);
 
   // ── Download Template ─────────────────────────────────────────
   const handleDownloadTemplate = () => {
@@ -69,6 +71,50 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
       });
+  };
+
+  // ── Download Egyptian Sample Dataset (Customers) ──────────────
+  const handleDownloadEgyptianSample = () => {
+    const token = localStorage.getItem('auth_token') || '';
+    const link = document.createElement('a');
+    link.setAttribute('download', `egyptian_customers_${sampleCount}.xlsx`);
+    fetch(`/api/erp/import/template/${module}?sample=egyptian&count=${sampleCount}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(r => r.blob())
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        link.href = url;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      });
+  };
+
+  // ── Generate & Preview Egyptian Sample Dataset Directly ───────
+  const handlePreviewEgyptianSample = async () => {
+    setLoadingSample(true);
+    setImportError('');
+    const token = localStorage.getItem('auth_token') || '';
+    try {
+      const res = await fetch(`/api/erp/import/sample-preview/${module}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ count: sampleCount })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'فشل توليد البيانات الافتراضية');
+      setValidation(data);
+      setStep('preview');
+    } catch (err: any) {
+      setImportError(err.message);
+    } finally {
+      setLoadingSample(false);
+    }
   };
 
   // ── Upload & Validate ─────────────────────────────────────────
@@ -216,6 +262,60 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
                     تنزيل نموذج Excel - {moduleNameAr}
                   </button>
                 </div>
+
+                {module === 'customers' && (
+                  <div className="bg-gradient-to-br from-blue-50 via-indigo-50/70 to-emerald-50/50 border-2 border-blue-200 rounded-2xl p-5 shadow-sm">
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                      <div className="text-right space-y-1.5 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-0.5 bg-blue-600 text-white text-[11px] font-black rounded-full">جديد - بيانات جاهزة</span>
+                          <h4 className="text-base font-black text-slate-900">جدول بيانات افتراضية لعملاء شركات مصرية واقعية (مئات العملاء)</h4>
+                        </div>
+                        <p className="text-xs text-slate-600 font-semibold leading-relaxed">
+                          يحتوي على أسماء شركات مصرية واقعية ومشهورة في مختلف القطاعات (مقاولات، أغذية، أدوية، حديد وصلب، إلكترونيات، تجارة وتوزيع) مع عناوين مصرية، أرقام موبايل مصرية (010/011/012/015)، أرقام تسجيل ضريبي مصرية، أرصدة افتتاحية، وحدود ائتمان مضبوطة تلقائياً على دليل حسابات شركتك.
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0 bg-white px-3 py-1.5 rounded-xl border border-blue-200 shadow-xs">
+                        <span className="text-xs font-bold text-slate-600">العدد:</span>
+                        {[100, 250, 500].map(cnt => (
+                          <button
+                            key={cnt}
+                            type="button"
+                            onClick={() => setSampleCount(cnt)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all ${
+                              sampleCount === cnt
+                                ? 'bg-blue-600 text-white shadow-xs'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            {cnt} شركة
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-blue-200/60 flex flex-wrap items-center justify-center sm:justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={handleDownloadEgyptianSample}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-white hover:bg-blue-50 text-blue-700 border-2 border-blue-300 font-black text-xs rounded-xl transition-all active:scale-95 shadow-xs"
+                      >
+                        <Download size={16} />
+                        تنزيل ملف Excel ({sampleCount} شركة مصرية جاهزة للرفع)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handlePreviewEgyptianSample}
+                        disabled={loadingSample}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-black text-xs rounded-xl transition-all active:scale-95 shadow-md shadow-blue-500/20"
+                      >
+                        {loadingSample ? <Loader2 size={16} className="animate-spin" /> : <Eye size={16} />}
+                        معاينة واستيراد {sampleCount} شركة مصرية فوراً
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* تنبيه باللون الأحمر بحذف المثال */}
                 {['journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods', 'opening_stock_balances', 'stock_adjustments', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers', 'customer_discounts', 'supplier_discounts', 'issued_cheques', 'received_cheques', 'goods_receipts', 'warehouse_transfers'].includes(module) && (

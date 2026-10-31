@@ -7,6 +7,7 @@ import multer from 'multer';
 import { ensureUniqueSequenceNumber } from './erp-api';
 import { recordAdjustment, recordGoodsReceipt, recordTransfer } from './cost-engine';
 import { InventoryMovementService } from '../services/InventoryMovementService';
+import { generateEgyptianCustomersAoA, generateEgyptianCustomersObjects } from './egyptian-customers-sample';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -410,10 +411,10 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
   const companyId = req.user?.company_id;
 
   // Load existing account codes with sub_account requirement to embed as reference in template
-  let accountsRef: { code: string; name: string; required_sub_account: boolean }[] = [];
+  let accountsRef: { code: string; name: string; required_sub_account: boolean; account_usage?: string }[] = [];
   try {
     const acRes = await pool.query(
-      `SELECT code, name, required_sub_account FROM accounts WHERE company_id = $1 ORDER BY code`,
+      `SELECT code, name, required_sub_account, account_usage FROM accounts WHERE company_id = $1 ORDER BY code`,
       [companyId]
     );
     accountsRef = acRes.rows;
@@ -422,7 +423,7 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
   const wb = XLSX.utils.book_new();
 
   // Helper to find account code
-  const findAccCode = (predicate: (a: { code: string; name: string; required_sub_account: boolean }) => boolean, fallback: string) => {
+  const findAccCode = (predicate: (a: { code: string; name: string; required_sub_account: boolean; account_usage?: string }) => boolean, fallback: string) => {
     const found = accountsRef.find(predicate);
     return found ? found.code : fallback;
   };
@@ -457,16 +458,25 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
     if (bankRes.rows[0]) sampleBankPm = bankRes.rows[0];
   } catch (e) { /* non-fatal */ }
 
-  const custAccCode = findAccCode(a => a.required_sub_account && (a.name.includes('عملاء') || a.name.toLowerCase().includes('customer')), '111');
-  const suppAccCode = findAccCode(a => a.required_sub_account && (a.name.includes('مورد') || a.name.toLowerCase().includes('supplier')), '211');
-  const cashAccCode = findAccCode(a => a.name.includes('خزين') || a.name.includes('صندوق') || a.name.includes('نقد') || a.code === '1101' || a.code === '101', '1101');
-  const revAccCode  = findAccCode(a => a.name.includes('إيراد') || a.name.includes('مبيعات') || a.code === '41', '41');
-  const costAccCode = findAccCode(a => a.name.includes('تكلفة') || a.code === '51', '51');
+  const custAccCode = findAccCode(
+    a => a.account_usage === 'customer' || a.code === '110201' || a.code === '1201' || a.code === '111' || (a.required_sub_account && (a.name.includes('عملاء') || a.name.toLowerCase().includes('customer'))) || a.name === 'العملاء' || a.name.includes('عملاء'),
+    '110201'
+  );
+  const suppAccCode = findAccCode(
+    a => a.account_usage === 'supplier' || a.code === '210101' || a.code === '211' || (a.required_sub_account && (a.name.includes('مورد') || a.name.toLowerCase().includes('supplier'))) || a.name === 'الموردون' || a.name.includes('مورد'),
+    '210101'
+  );
+  const cashAccCode = findAccCode(a => a.account_usage === 'cash' || a.account_usage === 'main_cash' || a.name.includes('خزين') || a.name.includes('صندوق') || a.name.includes('نقد') || a.code === '110101' || a.code === '1101' || a.code === '101', '110101');
+  const revAccCode  = findAccCode(a => a.account_usage === 'sales_revenue' || a.name.includes('إيراد') || a.name.includes('مبيعات') || a.code === '4101' || a.code === '41', '4101');
+  const costAccCode = findAccCode(a => a.account_usage === 'cost_of_sales' || a.name.includes('تكلفة') || a.code === '5101' || a.code === '51', '5101');
   const expAccCode  = findAccCode(a => a.name.includes('مصروف') || a.code === '511', '511');
-  const invAccCode  = findAccCode(a => a.name.includes('مخزون') || a.name.includes('بضاعة') || a.code === '1115', '1115');
-  const capAccCode  = findAccCode(a => a.name.includes('رأس المال') || a.name.includes('افتتاحي') || a.name.includes('أرباح') || a.code === '31', '31');
+  const invAccCode  = findAccCode(a => a.account_usage === 'inventory' || a.name.includes('مخزون') || a.name.includes('بضاعة') || a.code === '110301' || a.code === '1115', '110301');
+  const capAccCode  = findAccCode(a => a.account_usage === 'opening_balance' || a.code === '3104' || a.name.includes('افتتاحي') || a.name.includes('رصيد اول') || a.code === '31' || a.account_usage === 'capital' || a.name.includes('رأس المال') || a.code === '3101', '3104');
   const notesPayableAccCode = findAccCode(a => a.name.includes('أوراق دفع') || a.name.includes('اوراق دفع') || a.code === '210102', '210102');
   const notesReceivableAccCode = findAccCode(a => a.name.includes('أوراق قبض') || a.name.includes('اوراق قبض') || a.code === '110202', '110202');
+
+  const isEgyptianSampleRequest = req.query.sample === 'egyptian';
+  const requestedCount = Math.min(Math.max(Number(req.query.count) || 500, 10), 1000);
 
   let exampleRows: any[][] = [];
 
@@ -547,37 +557,52 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
       ]
     ];
   } else if (moduleName === 'customers') {
-    exampleRows = [
-      [
-        'CUST-EXAMPLE',
-        '1001',
-        'مثال توضيحي: شركة الأمل للتجارة (احذف هذا الصف قبل الرفع)',
-        '0501234567',
-        'customer@example.com',
-        'الرياض، شارع الملك فهد',
-        '300123456789003',
-        custAccCode,
-        '31',
-        5000,
-        '2026-01-01',
-        50000,
-        'credit',
-        30,
-        0
-      ]
-    ];
+    if (isEgyptianSampleRequest) {
+      let startIdx = 1;
+      try {
+        const exCustRes = await pool.query(`SELECT code FROM customers WHERE company_id = $1`, [companyId]);
+        for (const r of exCustRes.rows) {
+          const m = String(r.code || '').match(/(\d+)/);
+          if (m) {
+            const n = parseInt(m[1], 10);
+            if (!isNaN(n) && n < 90000 && n >= startIdx) startIdx = n + 1;
+          }
+        }
+      } catch (e) { /* ignore */ }
+      exampleRows = generateEgyptianCustomersAoA(requestedCount, custAccCode, capAccCode, startIdx);
+    } else {
+      exampleRows = [
+        [
+          'CUST-EXAMPLE',
+          '1001',
+          'مثال توضيحي: شركة الأمل للتجارة والتوريدات (احذف هذا الصف قبل الرفع)',
+          '01012345678',
+          'customer@example.com',
+          'القاهرة - مدينة نصر - شارع عباس العقاد',
+          '204581239',
+          custAccCode,
+          capAccCode,
+          5000,
+          '2026-01-01',
+          50000,
+          'credit',
+          30,
+          0
+        ]
+      ];
+    }
   } else if (moduleName === 'suppliers') {
     exampleRows = [
       [
         'SUPP-EXAMPLE',
         '2001',
         'مثال توضيحي: شركة التوريدات الحديثة (احذف هذا الصف قبل الرفع)',
-        '0509876543',
+        '01098765432',
         'supplier@example.com',
-        'جدة، المنطقة الصناعية',
-        '300987654321003',
+        'القاهرة - مدينة العبور - المنطقة الصناعية الأولى',
+        '300987654',
         suppAccCode,
-        '31',
+        capAccCode,
         10000,
         '2026-01-01',
         100000,
@@ -874,15 +899,17 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
     }
   }
 
-  // Style example rows in red font
-  for (let r = 1; r <= exampleRows.length; r++) {
-    for (let c = 0; c < colCount; c++) {
-      const cellRef = XLSX.utils.encode_cell({ r, c });
-      if (ws[cellRef]) {
-        ws[cellRef].s = {
-          font: { color: { rgb: 'B91C1C' }, sz: 10, italic: true },
-          alignment: { horizontal: 'center', vertical: 'center' }
-        };
+  // Style example rows in red font (only when not generating a ready-to-import sample dataset)
+  if (!isEgyptianSampleRequest) {
+    for (let r = 1; r <= exampleRows.length; r++) {
+      for (let c = 0; c < colCount; c++) {
+        const cellRef = XLSX.utils.encode_cell({ r, c });
+        if (ws[cellRef]) {
+          ws[cellRef].s = {
+            font: { color: { rgb: 'B91C1C' }, sz: 10, italic: true },
+            alignment: { horizontal: 'center', vertical: 'center' }
+          };
+        }
       }
     }
   }
@@ -894,6 +921,25 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
   ws['!cols'] = config.columns.map(() => ({ wch: 26 }));
   ws['!rows'] = rowHeights;
   XLSX.utils.book_append_sheet(wb, ws, config.nameAr);
+
+  // If downloading normal customers template, also embed a ready-to-use 500 Egyptian companies sheet
+  if (moduleName === 'customers' && !isEgyptianSampleRequest) {
+    let startIdx = 1;
+    try {
+      const exCustRes = await pool.query(`SELECT code FROM customers WHERE company_id = $1`, [companyId]);
+      for (const r of exCustRes.rows) {
+        const m = String(r.code || '').match(/(\d+)/);
+        if (m) {
+          const n = parseInt(m[1], 10);
+          if (!isNaN(n) && n < 90000 && n >= startIdx) startIdx = n + 1;
+        }
+      }
+    } catch (e) { /* ignore */ }
+    const sample500 = generateEgyptianCustomersAoA(500, custAccCode, capAccCode, startIdx);
+    const wsSample500 = XLSX.utils.aoa_to_sheet([arabicHeaders, ...sample500]);
+    wsSample500['!cols'] = config.columns.map(() => ({ wch: 26 }));
+    XLSX.utils.book_append_sheet(wb, wsSample500, 'بيانات 500 شركة مصرية');
+  }
 
   // ── Dropdown Values Sheet ─────────────────────────────────────
   const selectCols = config.columns.filter(c => c.type === 'select' && c.options?.length);
@@ -1134,11 +1180,87 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
   XLSX.utils.book_append_sheet(wb, wsInst, 'التعليمات');
 
   const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
+  const filenamePrefix = isEgyptianSampleRequest ? `egyptian_${moduleName}_${requestedCount}` : `template_${moduleName}`;
   res.set({
-    'Content-Disposition': `attachment; filename="template_${moduleName}_${Date.now()}.xlsx"`,
+    'Content-Disposition': `attachment; filename="${filenamePrefix}_${Date.now()}.xlsx"`,
     'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
   res.send(buffer);
+});
+
+// ================================================================
+// POST /import/sample-preview/:module  – Generate & validate sample data directly
+// ================================================================
+router.post('/import/sample-preview/:module', authenticateToken, async (req: AuthRequest, res) => {
+  const moduleName = req.params.module;
+  const config = IMPORT_CONFIGS[moduleName];
+  if (!config || moduleName !== 'customers') {
+    return res.status(404).json({ error: 'Sample preview only available for customers' });
+  }
+
+  const companyId = req.user?.company_id;
+  const count = Math.min(Math.max(Number(req.body?.count || req.query?.count) || 500, 10), 1000);
+
+  try {
+    const acRes = await pool.query(
+      'SELECT id, code, name, required_sub_account, account_usage FROM accounts WHERE company_id = $1 ORDER BY code',
+      [companyId]
+    );
+    const accountsList = acRes.rows;
+
+    const custAcc =
+      accountsList.find((a: any) => a.account_usage === 'customer') ||
+      accountsList.find((a: any) => a.code === '110201' || a.code === '1201' || a.code === '111') ||
+      accountsList.find((a: any) => a.name === 'العملاء' || a.name.includes('عملاء') || a.name.toLowerCase().includes('customer')) ||
+      accountsList[0];
+
+    const capAcc =
+      accountsList.find((a: any) => a.account_usage === 'opening_balance' || a.code === '3104') ||
+      accountsList.find((a: any) => a.name.includes('افتتاحي') || a.name.includes('رصيد اول') || a.code === '31') ||
+      accountsList.find((a: any) => a.account_usage === 'capital' || a.name.includes('رأس المال') || a.code === '3101') ||
+      accountsList[0];
+
+    let startIdx = 1;
+    const exCustRes = await pool.query('SELECT code FROM customers WHERE company_id = $1', [companyId]);
+    for (const r of exCustRes.rows) {
+      const m = String(r.code || '').match(/(\d+)/);
+      if (m) {
+        const n = parseInt(m[1], 10);
+        if (!isNaN(n) && n < 90000 && n >= startIdx) startIdx = n + 1;
+      }
+    }
+
+    const generated = generateEgyptianCustomersObjects(
+      count,
+      custAcc?.code || '110201',
+      capAcc?.code || '3104',
+      startIdx
+    );
+
+    const validatedRows = generated.map((row, i) => ({
+      rowNumber: i + 2,
+      data: {
+        ...row,
+        account_id: custAcc?.id || null,
+        account_name: custAcc?.name || 'العملاء',
+        counter_account_id: capAcc?.id || null,
+        counter_account_name: capAcc?.name || 'رصيد افتتاحي'
+      }
+    }));
+
+    return res.json({
+      total: validatedRows.length,
+      valid: validatedRows.length,
+      errors: 0,
+      validRows: validatedRows,
+      errorRows: [],
+      columns: config.columns.map(c => ({ key: c.key, label: c.label, type: c.type })),
+      moduleConfig: { nameAr: config.nameAr, uniqueKey: config.uniqueKey }
+    });
+  } catch (err: any) {
+    console.error('Sample preview error:', err);
+    return res.status(500).json({ error: err.message });
+  }
 });
 
 // ================================================================
@@ -2687,11 +2809,26 @@ router.post('/import/validate/:module', authenticateToken, upload.single('file')
     // ================================================================
     // STANDARD MODULES VALIDATION (Customers, Suppliers, Products, etc.)
     // ================================================================
-    const accountMap: Record<string, { id: string; name: string }> = {};
+    const accountMap: Record<string, { id: string; name: string; code: string; account_usage?: string }> = {};
+    let accountsList: { id: string; code: string; name: string; account_usage?: string }[] = [];
     try {
-      const acRes = await pool.query('SELECT id, code, name FROM accounts WHERE company_id = $1', [companyId]);
-      acRes.rows.forEach((r: any) => { accountMap[String(r.code).trim()] = { id: r.id, name: r.name }; });
+      const acRes = await pool.query('SELECT id, code, name, account_usage FROM accounts WHERE company_id = $1 ORDER BY code', [companyId]);
+      accountsList = acRes.rows;
+      acRes.rows.forEach((r: any) => { accountMap[String(r.code).trim()] = { id: r.id, name: r.name, code: String(r.code).trim(), account_usage: r.account_usage }; });
     } catch (e) { console.warn('Could not load accounts:', e); }
+
+    const defaultCustAcc =
+      accountsList.find(a => a.account_usage === 'customer') ||
+      accountsList.find(a => a.code === '110201' || a.code === '1201' || a.code === '111') ||
+      accountsList.find(a => a.name === 'العملاء' || a.name.includes('عملاء') || a.name.toLowerCase().includes('customer'));
+    const defaultSuppAcc =
+      accountsList.find(a => a.account_usage === 'supplier') ||
+      accountsList.find(a => a.code === '210101' || a.code === '211') ||
+      accountsList.find(a => a.name === 'الموردون' || a.name.includes('مورد') || a.name.toLowerCase().includes('supplier'));
+    const defaultCapAcc =
+      accountsList.find(a => a.account_usage === 'opening_balance' || a.code === '3104') ||
+      accountsList.find(a => a.name.includes('افتتاحي') || a.name.includes('رصيد اول') || a.code === '31') ||
+      accountsList.find(a => a.account_usage === 'capital' || a.name.includes('رأس المال') || a.code === '3101');
 
     let existingCodes = new Set<string>();
     const existingCodeToId: Record<string, string> = {};
@@ -2775,7 +2912,16 @@ router.post('/import/validate/:module', authenticateToken, upload.single('file')
 
         if (colDef.type === 'account_code') {
           const codeStr = String(value).trim();
-          const acct = accountMap[codeStr];
+          let acct = accountMap[codeStr];
+          if (!acct) {
+            if (moduleName === 'customers' && colDef.key === 'account_code' && defaultCustAcc) {
+              acct = defaultCustAcc;
+            } else if (moduleName === 'suppliers' && colDef.key === 'account_code' && defaultSuppAcc) {
+              acct = defaultSuppAcc;
+            } else if (colDef.key === 'counter_account_code' && defaultCapAcc) {
+              acct = defaultCapAcc;
+            }
+          }
           if (!acct) {
             errors.push(`كود الحساب "${codeStr}" في حقل "${colDef.label.replace(' *','')}" غير موجود في دليل الحسابات`);
             rowData[colDef.key] = null;
@@ -2784,7 +2930,7 @@ router.post('/import/validate/:module', authenticateToken, upload.single('file')
           const fieldBase = colDef.key.replace('_code', '');
           rowData[`${fieldBase}_id`]   = acct.id;
           rowData[`${fieldBase}_name`] = acct.name;
-          rowData[colDef.key] = codeStr;
+          rowData[colDef.key] = acct.code || codeStr;
           continue;
         }
 
@@ -3954,9 +4100,31 @@ router.post('/import/execute/:module', authenticateToken, async (req: AuthReques
     }
 
     // ── STANDARD MODULES EXECUTE ─────────────────────────────────
+    let defaultCounterAcc: { id: string; name: string } | null = null;
+    if (moduleName === 'customers' || moduleName === 'suppliers') {
+      const capRes = await client.query(
+        `SELECT id, code, name, account_usage FROM accounts WHERE company_id = $1 ORDER BY code`,
+        [companyId]
+      );
+      const foundCap =
+        capRes.rows.find((a: any) => a.account_usage === 'opening_balance' || a.code === '3104') ||
+        capRes.rows.find((a: any) => a.name.includes('افتتاحي') || a.name.includes('رصيد اول') || a.code === '31') ||
+        capRes.rows.find((a: any) => a.account_usage === 'capital' || a.name.includes('رأس المال') || a.code === '3101');
+      if (foundCap) defaultCounterAcc = { id: foundCap.id, name: foundCap.name };
+    }
+
     for (const { data, rowNumber } of rows) {
+      const counterAccNameFromData = data.counter_account_name || defaultCounterAcc?.name || 'رصيد افتتاحي';
       const rowToInsert: Record<string, any> = { ...data, company_id: companyId };
       delete rowToInsert['_existing'];
+      delete rowToInsert['counter_account_name'];
+
+      if ((moduleName === 'customers' || moduleName === 'suppliers') && rowToInsert.payment_terms && !rowToInsert.payment_method) {
+        rowToInsert.payment_method = rowToInsert.payment_terms;
+      }
+      if ((moduleName === 'customers' || moduleName === 'suppliers') && !rowToInsert.counter_account_id && defaultCounterAcc) {
+        rowToInsert.counter_account_id = defaultCounterAcc.id;
+      }
 
       Object.keys(rowToInsert).forEach(k => {
         if (k.endsWith('_code') && !['employee_code', 'item_group_code', 'eta_item_code', 'tax_item_code', 'code', 'manual_code'].includes(k)) {
@@ -3983,6 +4151,90 @@ router.post('/import/execute/:module', authenticateToken, async (req: AuthReques
         );
         if (result.rows[0]?.xmax === '0' || result.rows[0]?.xmax === 0) inserted++;
         else updated++;
+
+        // Automatically create or update Opening Balance Journal Entry for Customers & Suppliers
+        if (moduleName === 'customers' || moduleName === 'suppliers') {
+          const openingBal = Number(rowToInsert.opening_balance) || 0;
+          const entityId = rowToInsert.id;
+          const existingJeRes = await client.query(
+            `SELECT id, entry_number, reference_number FROM journal_entries
+             WHERE company_id = $1 AND reference_id = $2 AND reference_type = 'opening_balance' LIMIT 1`,
+            [companyId, entityId]
+          );
+          const existingJe = existingJeRes.rows[0];
+
+          if (Math.abs(openingBal) > 0.0001 && rowToInsert.account_id && rowToInsert.counter_account_id) {
+            const absBalance = Math.round(Math.abs(openingBal) * 100) / 100;
+            const isNegative = openingBal < 0;
+            const isCust = moduleName === 'customers';
+            const dateStr = String(rowToInsert.opening_balance_date || new Date().toISOString().slice(0, 10)).slice(0, 10);
+            const jeDesc = isCust
+              ? `رصيد افتتاحي للعميل: ${rowToInsert.name}`
+              : `رصيد افتتاحي للمورد: ${rowToInsert.name}`;
+
+            let jeId = existingJe?.id;
+            if (jeId) {
+              await client.query(
+                `UPDATE journal_entries SET
+                   date = $1, description = $2, total_debit = $3, total_credit = $4, status = 'posted', updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $5`,
+                [dateStr, jeDesc, absBalance, absBalance, jeId]
+              );
+              await client.query('DELETE FROM journal_entry_lines WHERE journal_entry_id = $1', [jeId]);
+            } else {
+              jeId = uuidv4();
+              const entryNumber = await ensureUniqueSequenceNumber(client, companyId || '', 'journal_entries', dateStr);
+              const opbRefNumber = await ensureUniqueSequenceNumber(client, companyId || '', 'opening_balances', dateStr);
+              await client.query(
+                `INSERT INTO journal_entries (
+                   id, company_id, entry_number, date, description,
+                   reference_id, reference_type, reference_number,
+                   total_debit, total_credit, status, created_by, created_at
+                 ) VALUES ($1, $2, $3, $4, $5, $6, 'opening_balance', $7, $8, $9, 'posted', $10, CURRENT_TIMESTAMP)`,
+                [
+                  jeId, companyId, entryNumber, dateStr, jeDesc,
+                  entityId, opbRefNumber, absBalance, absBalance, req.user?.id || 'system'
+                ]
+              );
+            }
+
+            const partyDebit = isCust ? (isNegative ? 0 : absBalance) : (isNegative ? absBalance : 0);
+            const partyCredit = isCust ? (isNegative ? absBalance : 0) : (isNegative ? 0 : absBalance);
+            const counterDebit = partyCredit;
+            const counterCredit = partyDebit;
+
+            // Party leg
+            await client.query(
+              `INSERT INTO journal_entry_lines (
+                 id, journal_entry_id, company_id, account_id, account_name,
+                 customer_id, customer_name, supplier_id, supplier_name,
+                 sub_account_id, sub_account_type, debit, credit, description, created_at
+               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)`,
+              [
+                uuidv4(), jeId, companyId, rowToInsert.account_id, rowToInsert.account_name || (isCust ? 'العملاء' : 'الموردون'),
+                isCust ? entityId : null, isCust ? rowToInsert.name : null,
+                !isCust ? entityId : null, !isCust ? rowToInsert.name : null,
+                entityId, isCust ? 'customer' : 'supplier',
+                partyDebit, partyCredit, `رصيد افتتاحي: ${rowToInsert.name}`
+              ]
+            );
+
+            // Counter leg
+            await client.query(
+              `INSERT INTO journal_entry_lines (
+                 id, journal_entry_id, company_id, account_id, account_name,
+                 debit, credit, description, created_at
+               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)`,
+              [
+                uuidv4(), jeId, companyId, rowToInsert.counter_account_id, counterAccNameFromData,
+                counterDebit, counterCredit, `الطرف المقابل للرصيد الافتتاحي: ${rowToInsert.name}`
+              ]
+            );
+          } else if (existingJe?.id) {
+            await client.query('DELETE FROM journal_entry_lines WHERE journal_entry_id = $1', [existingJe.id]);
+            await client.query('DELETE FROM journal_entries WHERE id = $1', [existingJe.id]);
+          }
+        }
       } catch (rowErr: any) {
         await client.query('ROLLBACK');
         return res.status(400).json({ error: `خطأ في الصف ${rowNumber}: ${rowErr.message}` });
