@@ -15,8 +15,23 @@ import {
   PlusCircle,
   Search,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  TrendingDown,
+  BarChart3,
+  Activity
 } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ReferenceLine
+} from 'recharts';
 import { dbService } from '../services/dbService';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -39,6 +54,11 @@ export default function Currencies() {
   const [isAddCurrencyOpen, setIsAddCurrencyOpen] = useState(false);
   const [isAddRateOpen, setIsAddRateOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isChartOpen, setIsChartOpen] = useState(false);
+  const [chartPeriod, setChartPeriod] = useState<'all' | '7d' | '30d' | '90d'>('all');
+  const [chartType, setChartType] = useState<'area' | 'line'>('area');
+  const [chartDateFrom, setChartDateFrom] = useState('');
+  const [chartDateTo, setChartDateTo] = useState('');
   const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [mainSearchQuery, setMainSearchQuery] = useState('');
@@ -181,18 +201,18 @@ export default function Currencies() {
     if (!user?.company_id) return;
     setLoadingHistory(true);
     try {
-      const isAuto = company?.settings?.exchange_rate_update_method === 'auto';
-      if (isAuto) {
-        const data = await apiRequest<any[]>(`/currency-rates/history?currency_code=${curr.code}&company_id=${user.company_id}`);
-        setAutoHistory(data);
-      } else {
-        const rates = await dbService.list<ExchangeRate>('exchange_rates', {
+      const [autoData, manualRates] = await Promise.all([
+        apiRequest<any[]>(`/currency-rates/history?currency_code=${curr.code}&company_id=${user.company_id}`).catch(() => []),
+        dbService.list<ExchangeRate>('exchange_rates', {
           currency_id: curr.id,
           company_id: user.company_id
-        });
-        const sorted = rates.sort((a, b) => new Date(b.rate_date).getTime() - new Date(a.rate_date).getTime());
-        setExchangeRates(prev => ({ ...prev, [curr.id]: sorted }));
-      }
+        }).catch(() => [])
+      ]);
+      setAutoHistory(Array.isArray(autoData) ? autoData : []);
+      const sorted = (Array.isArray(manualRates) ? manualRates : []).sort(
+        (a, b) => new Date(b.rate_date).getTime() - new Date(a.rate_date).getTime()
+      );
+      setExchangeRates(prev => ({ ...prev, [curr.id]: sorted }));
     } catch (error) {
       console.error('Failed to load rate history:', error);
       showNotification(t('common.error'), 'error');
@@ -572,6 +592,21 @@ export default function Currencies() {
                       </button>
                     )}
                   </div>
+
+                  <button
+                    onClick={() => {
+                      setSelectedCurrency(curr);
+                      setChartPeriod('all');
+                      setChartDateFrom('');
+                      setChartDateTo('');
+                      setIsChartOpen(true);
+                      loadHistory(curr);
+                    }}
+                    className="w-full flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200/80 py-2.5 rounded-xl hover:bg-emerald-100 transition-colors font-bold text-sm"
+                  >
+                    <TrendingUp className="w-4 h-4" />
+                    <span>{language === 'ar' ? 'رسم بياني لتغير سعر العملة' : 'Exchange Rate Change Chart'}</span>
+                  </button>
                 </div>
               </div>
             );
@@ -687,6 +722,20 @@ export default function Currencies() {
                             title={company?.settings?.exchange_rate_update_method === 'auto' ? (language === 'ar' ? 'سجل المزامنة' : 'Sync History') : t('currencies.history')}
                           >
                             <History className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedCurrency(curr);
+                              setChartPeriod('all');
+                              setChartDateFrom('');
+                              setChartDateTo('');
+                              setIsChartOpen(true);
+                              loadHistory(curr);
+                            }}
+                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                            title={language === 'ar' ? 'رسم بياني لتغير سعر العملة' : 'Exchange Rate Change Chart'}
+                          >
+                            <TrendingUp className="w-5 h-5" />
                           </button>
                           {(!latestRate || exchangeRates[curr.id]?.length === 0) && (
                             <button
@@ -1016,14 +1065,29 @@ export default function Currencies() {
                   <p className="text-xs text-zinc-400">{language === 'ar' ? selectedCurrency.name_ar : selectedCurrency.name_en}</p>
                 </div>
               </div>
-              <button onClick={() => {
-                setIsHistoryOpen(false);
-                setHistorySearchQuery('');
-                setHistoryDateFrom('');
-                setHistoryDateTo('');
-              }} className="text-zinc-400 hover:text-zinc-600">
-                <X className="w-6 h-6" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setIsHistoryOpen(false);
+                    setChartPeriod('all');
+                    setChartDateFrom('');
+                    setChartDateTo('');
+                    setIsChartOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition-colors text-xs font-bold"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  <span>{language === 'ar' ? 'عرض الرسم البياني' : 'View Chart'}</span>
+                </button>
+                <button onClick={() => {
+                  setIsHistoryOpen(false);
+                  setHistorySearchQuery('');
+                  setHistoryDateFrom('');
+                  setHistoryDateTo('');
+                }} className="text-zinc-400 hover:text-zinc-600">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
             </div>
 
             {/* History Filters */}
@@ -1131,7 +1195,7 @@ export default function Currencies() {
                         <div className="col-span-1 font-bold text-zinc-800">
                           {rate.status === 'Failed' ? '---' : Number(rate.exchange_rate).toLocaleString()}
                         </div>
-                        <div className="col-span-1 text-zinc-500">{rate.provider}</div>
+                        <div className="col-span-1 text-zinc-500 truncate px-1" title={rate.provider}>{rate.provider}</div>
                         <div className="col-span-1 text-zinc-500 font-mono text-[11px]">{rate.retrieved_date}</div>
                         <div className="col-span-1 text-zinc-400 font-mono text-[10px]">{rate.retrieved_time}</div>
                         <div className="col-span-1 text-zinc-500">{rate.updated_by}</div>
@@ -1191,6 +1255,478 @@ export default function Currencies() {
           </div>
         </div>
       )}
+
+      {/* Exchange Rate Change Chart Modal */}
+      {isChartOpen && selectedCurrency && (() => {
+        const baseCurr = company?.settings?.currency || 'EGP';
+
+        // Parse date strings (DD/MM/YYYY or YYYY-MM-DD) into ISO YYYY-MM-DD and display DD/MM/YYYY
+        const parseDateInfo = (rawDate: string, rawTime?: string) => {
+          const str = String(rawDate || '').trim();
+          let isoDate = '';
+          let displayDate = str;
+          const dmyMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+          const ymdMatch = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+          if (dmyMatch) {
+            const dd = dmyMatch[1].padStart(2, '0');
+            const mm = dmyMatch[2].padStart(2, '0');
+            const yyyy = dmyMatch[3];
+            isoDate = `${yyyy}-${mm}-${dd}`;
+            displayDate = `${dd}/${mm}/${yyyy}`;
+          } else if (ymdMatch) {
+            const yyyy = ymdMatch[1];
+            const mm = ymdMatch[2].padStart(2, '0');
+            const dd = ymdMatch[3].padStart(2, '0');
+            isoDate = `${yyyy}-${mm}-${dd}`;
+            displayDate = `${dd}/${mm}/${yyyy}`;
+          } else {
+            const d = new Date(str);
+            if (!isNaN(d.getTime())) {
+              isoDate = format(d, 'yyyy-MM-dd');
+              displayDate = format(d, 'dd/MM/yyyy');
+            }
+          }
+          const ts = isoDate ? new Date(`${isoDate}T00:00:00`).getTime() : 0;
+          return { isoDate, displayDate, timestamp: ts, time: rawTime || '' };
+        };
+
+        // Build raw points from autoHistory (if available) and manual exchange_rates
+        const validAuto = (autoHistory || [])
+          .filter(r => r.status !== 'Failed' && Number(r.exchange_rate) > 0)
+          .map(r => {
+            const dInfo = parseDateInfo(r.retrieved_date || r.created_at, r.retrieved_time);
+            return {
+              id: r.id,
+              rate: Number(r.exchange_rate),
+              isoDate: dInfo.isoDate,
+              displayDate: dInfo.displayDate,
+              shortDate: dInfo.displayDate.slice(0, 5),
+              time: dInfo.time,
+              timestamp: r.created_at ? new Date(r.created_at).getTime() : dInfo.timestamp,
+              source: r.provider || (language === 'ar' ? 'تلقائي' : 'Auto')
+            };
+          });
+
+        const validManual = (exchangeRates[selectedCurrency.id] || [])
+          .filter(r => Number(r.exchange_rate) > 0)
+          .map(r => {
+            const dInfo = parseDateInfo(r.rate_date);
+            return {
+              id: r.id,
+              rate: Number(r.exchange_rate),
+              isoDate: dInfo.isoDate,
+              displayDate: dInfo.displayDate,
+              shortDate: dInfo.displayDate.slice(0, 5),
+              time: '',
+              timestamp: dInfo.timestamp,
+              source: r.notes || (language === 'ar' ? 'إدخال يدوي' : 'Manual')
+            };
+          });
+
+        // Prefer auto history if company uses auto or if auto has records; otherwise use manual or merge
+        let combinedPoints = validAuto.length > 0 ? validAuto : validManual;
+        if (combinedPoints.length === 0 && autoRates[selectedCurrency.id]) {
+          const ar = autoRates[selectedCurrency.id]!;
+          const dInfo = parseDateInfo(ar.rate_date);
+          combinedPoints = [{
+            id: 'latest-auto',
+            rate: Number(ar.rate),
+            isoDate: dInfo.isoDate,
+            displayDate: dInfo.displayDate,
+            shortDate: dInfo.displayDate.slice(0, 5),
+            time: '',
+            timestamp: dInfo.timestamp,
+            source: language === 'ar' ? 'سعر تلقائي' : 'Live Rate'
+          }];
+        }
+
+        // Sort chronologically (oldest -> newest)
+        const chronologicalAll = [...combinedPoints].sort((a, b) => a.timestamp - b.timestamp);
+
+        // Apply period / date filters
+        const latestTs = chronologicalAll.length > 0 ? chronologicalAll[chronologicalAll.length - 1].timestamp : Date.now();
+        const filteredPoints = chronologicalAll.filter(pt => {
+          if (chartDateFrom && pt.isoDate && pt.isoDate < chartDateFrom) return false;
+          if (chartDateTo && pt.isoDate && pt.isoDate > chartDateTo) return false;
+          if (!chartDateFrom && !chartDateTo && chartPeriod !== 'all') {
+            const daysMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90 };
+            const days = daysMap[chartPeriod] || 30;
+            const cutoff = latestTs - days * 24 * 60 * 60 * 1000;
+            if (pt.timestamp < cutoff) return false;
+          }
+          return true;
+        });
+
+        // Enrich with point-to-point delta
+        const chartData = filteredPoints.map((pt, idx) => {
+          const prev = idx > 0 ? filteredPoints[idx - 1].rate : pt.rate;
+          const diff = pt.rate - prev;
+          const diffPct = prev > 0 ? (diff / prev) * 100 : 0;
+          return {
+            ...pt,
+            diff,
+            diffPct
+          };
+        });
+
+        // Calculate KPI metrics
+        const firstRate = chartData.length > 0 ? chartData[0].rate : 0;
+        const currentRate = chartData.length > 0 ? chartData[chartData.length - 1].rate : 0;
+        const currentDate = chartData.length > 0 ? chartData[chartData.length - 1].displayDate : '---';
+        const totalChange = currentRate - firstRate;
+        const totalChangePct = firstRate > 0 ? (totalChange / firstRate) * 100 : 0;
+
+        let minPoint = chartData[0] || null;
+        let maxPoint = chartData[0] || null;
+        let sumRates = 0;
+        for (const p of chartData) {
+          sumRates += p.rate;
+          if (!minPoint || p.rate < minPoint.rate) minPoint = p;
+          if (!maxPoint || p.rate > maxPoint.rate) maxPoint = p;
+        }
+        const avgRate = chartData.length > 0 ? sumRates / chartData.length : 0;
+        const yPadding = maxPoint && minPoint
+          ? Math.max((maxPoint.rate - minPoint.rate) * 0.2, currentRate * 0.005, 0.05)
+          : 1;
+        const yMin = minPoint ? Math.max(0, Number((minPoint.rate - yPadding).toFixed(4))) : 0;
+        const yMax = maxPoint ? Number((maxPoint.rate + yPadding).toFixed(4)) : 100;
+
+        const isUp = totalChange > 0.0001;
+        const isDown = totalChange < -0.0001;
+
+        return (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 max-h-[90vh] flex flex-col" dir={dir}>
+              {/* Modal Header */}
+              <div className="p-5 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center justify-center">
+                    <TrendingUp className="w-6 h-6 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                      <span>{language === 'ar' ? 'الرسم البياني لتغير سعر العملة' : 'Exchange Rate Trend Chart'}</span>
+                      <span className="text-xs font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-lg">
+                        {selectedCurrency.code} / {baseCurr}
+                      </span>
+                    </h2>
+                    <p className="text-xs text-zinc-500 flex items-center gap-1.5 mt-0.5">
+                      <span>{selectedCurrency.flag}</span>
+                      <span>{language === 'ar' ? selectedCurrency.name_ar : selectedCurrency.name_en}</span>
+                      <span>•</span>
+                      <span>{language === 'ar' ? `${chartData.length} قراءة مسجلة` : `${chartData.length} recorded points`}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setIsChartOpen(false);
+                      setIsHistoryOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 text-zinc-700 rounded-xl hover:bg-zinc-200 transition-colors text-xs font-bold"
+                  >
+                    <History className="w-4 h-4" />
+                    <span>{language === 'ar' ? 'سجل الأسعار' : 'Rate History'}</span>
+                  </button>
+                  <button
+                    onClick={() => setIsChartOpen(false)}
+                    className="p-1.5 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Filters & Controls Bar */}
+              <div className="px-5 py-3 bg-zinc-50 border-b border-zinc-100 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-zinc-200">
+                  {([
+                    { id: 'all', labelAr: 'الكل', labelEn: 'All' },
+                    { id: '7d', labelAr: 'آخر 7 أيام', labelEn: '7 Days' },
+                    { id: '30d', labelAr: 'آخر 30 يوم', labelEn: '30 Days' },
+                    { id: '90d', labelAr: 'آخر 90 يوم', labelEn: '90 Days' },
+                  ] as const).map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        setChartPeriod(p.id);
+                        setChartDateFrom('');
+                        setChartDateTo('');
+                      }}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                        chartPeriod === p.id && !chartDateFrom && !chartDateTo
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'text-zinc-600 hover:bg-zinc-100'
+                      }`}
+                    >
+                      {language === 'ar' ? p.labelAr : p.labelEn}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5 bg-white border border-zinc-200 rounded-xl px-2.5 py-1">
+                    <Calendar className="w-3.5 h-3.5 text-zinc-400" />
+                    <input
+                      type="date"
+                      value={chartDateFrom}
+                      onChange={e => setChartDateFrom(e.target.value)}
+                      className="text-xs focus:outline-none bg-transparent font-mono"
+                      title={language === 'ar' ? 'من تاريخ' : 'From date'}
+                    />
+                    <span className="text-zinc-300">-</span>
+                    <input
+                      type="date"
+                      value={chartDateTo}
+                      onChange={e => setChartDateTo(e.target.value)}
+                      className="text-xs focus:outline-none bg-transparent font-mono"
+                      title={language === 'ar' ? 'إلى تاريخ' : 'To date'}
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-zinc-200">
+                    <button
+                      onClick={() => setChartType('area')}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                        chartType === 'area' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:bg-zinc-100'
+                      }`}
+                    >
+                      {language === 'ar' ? 'مساحي' : 'Area'}
+                    </button>
+                    <button
+                      onClick={() => setChartType('line')}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                        chartType === 'line' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:bg-zinc-100'
+                      }`}
+                    >
+                      {language === 'ar' ? 'خطي' : 'Line'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="p-5 overflow-y-auto space-y-5 flex-1">
+                {loadingHistory ? (
+                  <div className="flex flex-col items-center justify-center py-16 space-y-4">
+                    <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest animate-pulse">
+                      {language === 'ar' ? 'جاري تحميل بيانات الرسم البياني...' : 'Loading chart data...'}
+                    </p>
+                  </div>
+                ) : chartData.length === 0 ? (
+                  <div className="py-16 text-center text-zinc-400 bg-zinc-50 rounded-2xl border border-dashed border-zinc-200">
+                    <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                    <p className="text-sm font-bold">{language === 'ar' ? 'لا توجد قراءات أسعار صرف مسجلة لهذه الفترة' : 'No exchange rate records found for this period'}</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* 4 Summary KPI Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="p-3.5 rounded-2xl bg-zinc-50 border border-zinc-200/80">
+                        <p className="text-[11px] font-bold text-zinc-400">{language === 'ar' ? 'آخر سعر صرف' : 'Latest Rate'}</p>
+                        <p className="text-lg font-black text-zinc-900 font-mono mt-0.5">
+                          {currentRate.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} <span className="text-xs font-bold text-zinc-500">{baseCurr}</span>
+                        </p>
+                        <p className="text-[10px] text-zinc-400 font-mono mt-0.5">{currentDate}</p>
+                      </div>
+
+                      <div className={`p-3.5 rounded-2xl border ${
+                        isUp ? 'bg-emerald-50/60 border-emerald-200' : isDown ? 'bg-rose-50/60 border-rose-200' : 'bg-zinc-50 border-zinc-200/80'
+                      }`}>
+                        <p className="text-[11px] font-bold text-zinc-500">{language === 'ar' ? 'مقدار ونسبة التغير' : 'Change'}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          {isUp ? (
+                            <TrendingUp className="w-4 h-4 text-emerald-600 shrink-0" />
+                          ) : isDown ? (
+                            <TrendingDown className="w-4 h-4 text-rose-600 shrink-0" />
+                          ) : (
+                            <Activity className="w-4 h-4 text-zinc-500 shrink-0" />
+                          )}
+                          <span className={`text-base font-black font-mono ${
+                            isUp ? 'text-emerald-700' : isDown ? 'text-rose-700' : 'text-zinc-800'
+                          }`} dir="ltr">
+                            {totalChange >= 0 ? '+' : ''}{totalChange.toFixed(4)} ({totalChangePct >= 0 ? '+' : ''}{totalChangePct.toFixed(2)}%)
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-zinc-500 mt-0.5">
+                          {language === 'ar' ? `مقارنة ببداية الفترة (${firstRate.toFixed(4)})` : `vs period start (${firstRate.toFixed(4)})`}
+                        </p>
+                      </div>
+
+                      <div className="p-3.5 rounded-2xl bg-blue-50/50 border border-blue-100">
+                        <p className="text-[11px] font-bold text-blue-500">{language === 'ar' ? 'أعلى سعر مسجل' : 'Highest Rate'}</p>
+                        <p className="text-lg font-black text-blue-900 font-mono mt-0.5">
+                          {maxPoint ? maxPoint.rate.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '---'} <span className="text-xs font-bold text-blue-600">{baseCurr}</span>
+                        </p>
+                        <p className="text-[10px] text-blue-500 font-mono mt-0.5">{maxPoint?.displayDate || '---'}</p>
+                      </div>
+
+                      <div className="p-3.5 rounded-2xl bg-amber-50/50 border border-amber-100">
+                        <p className="text-[11px] font-bold text-amber-600">{language === 'ar' ? 'أقل سعر مسجل' : 'Lowest Rate'}</p>
+                        <p className="text-lg font-black text-amber-900 font-mono mt-0.5">
+                          {minPoint ? minPoint.rate.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '---'} <span className="text-xs font-bold text-amber-700">{baseCurr}</span>
+                        </p>
+                        <p className="text-[10px] text-amber-600 font-mono mt-0.5">{minPoint?.displayDate || '---'}</p>
+                      </div>
+                    </div>
+
+                    {/* Chart Container */}
+                    <div className="bg-zinc-50/70 border border-zinc-200/80 rounded-2xl p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-bold text-zinc-700">
+                          {language === 'ar'
+                            ? `منحنى حركة سعر ${selectedCurrency.name_ar} (1 ${selectedCurrency.code} مقابل ${baseCurr})`
+                            : `${selectedCurrency.name_en} Exchange Rate Trend (1 ${selectedCurrency.code} to ${baseCurr})`}
+                        </span>
+                        <span className="text-[11px] font-mono text-zinc-500">
+                          {language === 'ar' ? `المتوسط: ${avgRate.toFixed(4)} ${baseCurr}` : `Avg: ${avgRate.toFixed(4)} ${baseCurr}`}
+                        </span>
+                      </div>
+
+                      <div className="h-[320px] w-full" dir="ltr">
+                        <ResponsiveContainer width="100%" height="100%">
+                          {chartType === 'area' ? (
+                            <AreaChart data={chartData} margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
+                              <defs>
+                                <linearGradient id="currencyRateGradient" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="#059669" stopOpacity={0.35} />
+                                  <stop offset="95%" stopColor="#059669" stopOpacity={0.02} />
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
+                              <XAxis
+                                dataKey="shortDate"
+                                tick={{ fontSize: 11, fill: '#71717a', fontWeight: 600 }}
+                                axisLine={{ stroke: '#e4e4e7' }}
+                                tickLine={false}
+                              />
+                              <YAxis
+                                domain={[yMin, yMax]}
+                                tick={{ fontSize: 11, fill: '#71717a', fontWeight: 600 }}
+                                axisLine={false}
+                                tickLine={false}
+                                tickFormatter={(val: number) => Number(val).toFixed(2)}
+                                width={55}
+                              />
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (!active || !payload || !payload.length) return null;
+                                  const pt = payload[0].payload;
+                                  return (
+                                    <div className="bg-zinc-900 text-white p-3 rounded-xl shadow-xl border border-zinc-700 text-xs space-y-1" dir={dir}>
+                                      <div className="font-mono text-zinc-300 flex items-center justify-between gap-4 border-b border-zinc-700/80 pb-1">
+                                        <span>{pt.displayDate}</span>
+                                        {pt.time && <span className="text-[10px] text-zinc-400">{pt.time}</span>}
+                                      </div>
+                                      <div className="font-black text-sm text-emerald-400 font-mono pt-0.5" dir="ltr">
+                                        1 {selectedCurrency.code} = {Number(pt.rate).toFixed(4)} {baseCurr}
+                                      </div>
+                                      {pt.diff !== 0 && (
+                                        <div className={`text-[11px] font-bold font-mono ${pt.diff > 0 ? 'text-emerald-300' : 'text-rose-300'}`} dir="ltr">
+                                          {pt.diff > 0 ? '▲ +' : '▼ '}{pt.diff.toFixed(4)} ({pt.diffPct >= 0 ? '+' : ''}{pt.diffPct.toFixed(2)}%)
+                                        </div>
+                                      )}
+                                      {pt.source && (
+                                        <div className="text-[10px] text-zinc-400">
+                                          {language === 'ar' ? `المصدر: ${pt.source}` : `Source: ${pt.source}`}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                }}
+                              />
+                              {chartData.length > 1 && (
+                                <ReferenceLine
+                                  y={avgRate}
+                                  stroke="#94a3b8"
+                                  strokeDasharray="4 4"
+                                />
+                              )}
+                              <Area
+                                type="monotone"
+                                dataKey="rate"
+                                stroke="#059669"
+                                strokeWidth={2.5}
+                                fillOpacity={1}
+                                fill="url(#currencyRateGradient)"
+                                dot={{ r: 3.5, fill: '#059669', strokeWidth: 2, stroke: '#ffffff' }}
+                                activeDot={{ r: 6, fill: '#059669', stroke: '#ffffff', strokeWidth: 2 }}
+                              />
+                            </AreaChart>
+                          ) : (
+                            <LineChart data={chartData} margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
+                              <XAxis
+                                dataKey="shortDate"
+                                tick={{ fontSize: 11, fill: '#71717a', fontWeight: 600 }}
+                                axisLine={{ stroke: '#e4e4e7' }}
+                                tickLine={false}
+                              />
+                              <YAxis
+                                domain={[yMin, yMax]}
+                                tick={{ fontSize: 11, fill: '#71717a', fontWeight: 600 }}
+                                axisLine={false}
+                                tickLine={false}
+                                tickFormatter={(val: number) => Number(val).toFixed(2)}
+                                width={55}
+                              />
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (!active || !payload || !payload.length) return null;
+                                  const pt = payload[0].payload;
+                                  return (
+                                    <div className="bg-zinc-900 text-white p-3 rounded-xl shadow-xl border border-zinc-700 text-xs space-y-1" dir={dir}>
+                                      <div className="font-mono text-zinc-300 flex items-center justify-between gap-4 border-b border-zinc-700/80 pb-1">
+                                        <span>{pt.displayDate}</span>
+                                        {pt.time && <span className="text-[10px] text-zinc-400">{pt.time}</span>}
+                                      </div>
+                                      <div className="font-black text-sm text-emerald-400 font-mono pt-0.5" dir="ltr">
+                                        1 {selectedCurrency.code} = {Number(pt.rate).toFixed(4)} {baseCurr}
+                                      </div>
+                                      {pt.diff !== 0 && (
+                                        <div className={`text-[11px] font-bold font-mono ${pt.diff > 0 ? 'text-emerald-300' : 'text-rose-300'}`} dir="ltr">
+                                          {pt.diff > 0 ? '▲ +' : '▼ '}{pt.diff.toFixed(4)} ({pt.diffPct >= 0 ? '+' : ''}{pt.diffPct.toFixed(2)}%)
+                                        </div>
+                                      )}
+                                      {pt.source && (
+                                        <div className="text-[10px] text-zinc-400">
+                                          {language === 'ar' ? `المصدر: ${pt.source}` : `Source: ${pt.source}`}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                }}
+                              />
+                              {chartData.length > 1 && (
+                                <ReferenceLine
+                                  y={avgRate}
+                                  stroke="#94a3b8"
+                                  strokeDasharray="4 4"
+                                />
+                              )}
+                              <Line
+                                type="monotone"
+                                dataKey="rate"
+                                stroke="#059669"
+                                strokeWidth={2.5}
+                                dot={{ r: 3.5, fill: '#059669', strokeWidth: 2, stroke: '#ffffff' }}
+                                activeDot={{ r: 6, fill: '#059669', stroke: '#ffffff', strokeWidth: 2 }}
+                              />
+                            </LineChart>
+                          )}
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
