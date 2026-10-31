@@ -400,6 +400,13 @@ const IMPORT_CONFIGS: Record<string, {
   }
 };
 
+const resolveImportCompanyId = (req: AuthRequest): string | undefined => {
+  const fromHeader = (req.headers['x-company-id'] as string)?.trim();
+  const fromQuery = (req.query?.company_id as string)?.trim();
+  const fromBody = typeof req.body?.company_id === 'string' ? req.body.company_id.trim() : '';
+  return fromHeader || fromQuery || fromBody || req.user?.company_id;
+};
+
 // ================================================================
 // GET /import/template/:module  – Download Excel template
 // ================================================================
@@ -408,7 +415,7 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
   const config = IMPORT_CONFIGS[moduleName];
   if (!config) return res.status(404).json({ error: 'Module not found' });
 
-  const companyId = req.user?.company_id;
+  const companyId = resolveImportCompanyId(req);
 
   // Load existing account codes with sub_account requirement to embed as reference in template
   let accountsRef: { code: string; name: string; required_sub_account: boolean; account_usage?: string }[] = [];
@@ -1198,7 +1205,7 @@ router.post('/import/sample-preview/:module', authenticateToken, async (req: Aut
     return res.status(404).json({ error: 'Sample preview only available for customers' });
   }
 
-  const companyId = req.user?.company_id;
+  const companyId = resolveImportCompanyId(req);
   const count = Math.min(Math.max(Number(req.body?.count || req.query?.count) || 500, 10), 1000);
 
   try {
@@ -1272,7 +1279,7 @@ router.post('/import/validate/:module', authenticateToken, upload.single('file')
   if (!config) return res.status(404).json({ error: 'Module not found' });
   if (!req.file)  return res.status(400).json({ error: 'No file uploaded' });
 
-  const companyId = req.user?.company_id;
+  const companyId = resolveImportCompanyId(req);
 
   try {
     const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
@@ -2996,7 +3003,7 @@ router.post('/import/execute/:module', authenticateToken, async (req: AuthReques
   const { rows } = req.body as { rows: { data: Record<string, any>; rowNumber: number }[] };
   if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ error: 'No rows to import' });
 
-  const companyId = req.user?.company_id;
+  const companyId = resolveImportCompanyId(req);
   const client    = await pool.connect();
   let inserted = 0, updated = 0;
 

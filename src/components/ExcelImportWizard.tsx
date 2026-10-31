@@ -6,6 +6,7 @@ import {
   X, Info, ArrowRight, ArrowLeft, Check
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ImportColumn {
   key: string;
@@ -40,6 +41,7 @@ type Step = 'download' | 'upload' | 'preview' | 'done';
 
 export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClose, onSuccess }) => {
   const { dir } = useLanguage();
+  const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<Step>('download');
   const [uploading, setUploading] = useState(false);
@@ -52,15 +54,30 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
   const [sampleCount, setSampleCount] = useState<number>(500);
   const [loadingSample, setLoadingSample] = useState(false);
 
+  const getActiveCompanyId = useCallback(() => {
+    if (user?.company_id) return user.company_id;
+    const stored = localStorage.getItem('current_company_id');
+    if (stored) return stored;
+    try {
+      const authUser = JSON.parse(localStorage.getItem('auth_user') || '{}');
+      if (authUser?.company_id) return authUser.company_id;
+    } catch {}
+    return '';
+  }, [user?.company_id]);
+
   // ── Download Template ─────────────────────────────────────────
   const handleDownloadTemplate = () => {
     const token = localStorage.getItem('auth_token') || '';
+    const companyId = getActiveCompanyId();
     const link = document.createElement('a');
-    link.href = `/api/erp/import/template/${module}`;
+    link.href = `/api/erp/import/template/${module}?company_id=${encodeURIComponent(companyId)}`;
     link.setAttribute('download', `template_${module}.xlsx`);
     // Use fetch with auth header
-    fetch(`/api/erp/import/template/${module}`, {
-      headers: { Authorization: `Bearer ${token}` }
+    fetch(`/api/erp/import/template/${module}?company_id=${encodeURIComponent(companyId)}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(companyId ? { 'x-company-id': companyId } : {})
+      }
     })
       .then(r => r.blob())
       .then(blob => {
@@ -76,10 +93,14 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
   // ── Download Egyptian Sample Dataset (Customers) ──────────────
   const handleDownloadEgyptianSample = () => {
     const token = localStorage.getItem('auth_token') || '';
+    const companyId = getActiveCompanyId();
     const link = document.createElement('a');
     link.setAttribute('download', `egyptian_customers_${sampleCount}.xlsx`);
-    fetch(`/api/erp/import/template/${module}?sample=egyptian&count=${sampleCount}`, {
-      headers: { Authorization: `Bearer ${token}` }
+    fetch(`/api/erp/import/template/${module}?sample=egyptian&count=${sampleCount}&company_id=${encodeURIComponent(companyId)}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(companyId ? { 'x-company-id': companyId } : {})
+      }
     })
       .then(r => r.blob())
       .then(blob => {
@@ -97,14 +118,16 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
     setLoadingSample(true);
     setImportError('');
     const token = localStorage.getItem('auth_token') || '';
+    const companyId = getActiveCompanyId();
     try {
-      const res = await fetch(`/api/erp/import/sample-preview/${module}`, {
+      const res = await fetch(`/api/erp/import/sample-preview/${module}?company_id=${encodeURIComponent(companyId)}`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...(companyId ? { 'x-company-id': companyId } : {})
         },
-        body: JSON.stringify({ count: sampleCount })
+        body: JSON.stringify({ count: sampleCount, company_id: companyId })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'فشل توليد البيانات الافتراضية');
@@ -129,11 +152,15 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
     const formData = new FormData();
     formData.append('file', file);
     const token = localStorage.getItem('auth_token') || '';
+    const companyId = getActiveCompanyId();
 
     try {
-      const res = await fetch(`/api/erp/import/validate/${module}`, {
+      const res = await fetch(`/api/erp/import/validate/${module}?company_id=${encodeURIComponent(companyId)}`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...(companyId ? { 'x-company-id': companyId } : {})
+        },
         body: formData
       });
       const data = await res.json();
@@ -146,7 +173,7 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
-  }, [module]);
+  }, [module, getActiveCompanyId]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -162,20 +189,23 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
     setImporting(true);
     setImportError('');
     const token = localStorage.getItem('auth_token') || '';
+    const companyId = getActiveCompanyId();
     try {
-      const res = await fetch(`/api/erp/import/execute/${module}`, {
+      const res = await fetch(`/api/erp/import/execute/${module}?company_id=${encodeURIComponent(companyId)}`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...(companyId ? { 'x-company-id': companyId } : {})
         },
-        body: JSON.stringify({ rows: validation.validRows })
+        body: JSON.stringify({ rows: validation.validRows, company_id: companyId })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'فشل الاستيراد');
       setImportResult(data);
       setStep('done');
-      onSuccess();
+      window.dispatchEvent(new CustomEvent('db-refresh', { detail: { collection: module } }));
+      window.dispatchEvent(new CustomEvent('db-refresh', { detail: { collection: 'journal_entries' } }));
     } catch (err: any) {
       setImportError(err.message);
     } finally {
@@ -679,7 +709,12 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
                   </div>
                 </div>
                 <button
-                  onClick={onClose}
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('db-refresh', { detail: { collection: module } }));
+                    window.dispatchEvent(new CustomEvent('db-refresh', { detail: { collection: 'journal_entries' } }));
+                    onSuccess();
+                    onClose();
+                  }}
                   className="inline-flex items-center gap-2 px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl transition-all active:scale-95"
                 >
                   <Check size={18} />
