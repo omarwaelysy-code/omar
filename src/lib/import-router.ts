@@ -929,25 +929,6 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
   ws['!rows'] = rowHeights;
   XLSX.utils.book_append_sheet(wb, ws, config.nameAr);
 
-  // If downloading normal customers template, also embed a ready-to-use 500 Egyptian companies sheet
-  if (moduleName === 'customers' && !isEgyptianSampleRequest) {
-    let startIdx = 1;
-    try {
-      const exCustRes = await pool.query(`SELECT code FROM customers WHERE company_id = $1`, [companyId]);
-      for (const r of exCustRes.rows) {
-        const m = String(r.code || '').match(/(\d+)/);
-        if (m) {
-          const n = parseInt(m[1], 10);
-          if (!isNaN(n) && n < 90000 && n >= startIdx) startIdx = n + 1;
-        }
-      }
-    } catch (e) { /* ignore */ }
-    const sample500 = generateEgyptianCustomersAoA(500, custAccCode, capAccCode, startIdx);
-    const wsSample500 = XLSX.utils.aoa_to_sheet([arabicHeaders, ...sample500]);
-    wsSample500['!cols'] = config.columns.map(() => ({ wch: 26 }));
-    XLSX.utils.book_append_sheet(wb, wsSample500, 'بيانات 500 شركة مصرية');
-  }
-
   // ── Dropdown Values Sheet ─────────────────────────────────────
   const selectCols = config.columns.filter(c => c.type === 'select' && c.options?.length);
   if (selectCols.length > 0) {
@@ -2877,14 +2858,39 @@ router.post('/import/validate/:module', authenticateToken, upload.single('file')
 
         if (typeof value === 'string') value = value.trim();
 
-        if (colDef.type === 'date' && typeof value === 'number') {
-          try {
-            const d = XLSX.SSF.parse_date_code(value);
-            if (d) value = `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
-          } catch { /* ignore */ }
+        if (colDef.type === 'date' && value !== undefined && value !== null && value !== '') {
+          if (typeof value === 'number') {
+            try {
+              const d = XLSX.SSF.parse_date_code(value);
+              if (d) value = `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+            } catch { /* ignore */ }
+          } else if (typeof value === 'string') {
+            const s = value.trim();
+            const mYMD = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+            const mDMY = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+            if (mYMD) {
+              value = `${mYMD[1]}-${mYMD[2].padStart(2, '0')}-${mYMD[3].padStart(2, '0')}`;
+            } else if (mDMY) {
+              value = `${mDMY[3]}-${mDMY[2].padStart(2, '0')}-${mDMY[1].padStart(2, '0')}`;
+            }
+          }
         }
 
         const isEmpty = value === undefined || value === null || value === '';
+
+        if (isEmpty && colDef.type === 'account_code') {
+          let fallbackAcct: { id: string; name: string; code: string } | undefined;
+          if (moduleName === 'customers' && colDef.key === 'account_code') fallbackAcct = defaultCustAcc;
+          else if (moduleName === 'suppliers' && colDef.key === 'account_code') fallbackAcct = defaultSuppAcc;
+          else if (colDef.key === 'counter_account_code') fallbackAcct = defaultCapAcc;
+          if (fallbackAcct) {
+            const fieldBase = colDef.key.replace('_code', '');
+            rowData[`${fieldBase}_id`]   = fallbackAcct.id;
+            rowData[`${fieldBase}_name`] = fallbackAcct.name;
+            rowData[colDef.key]          = fallbackAcct.code;
+            continue;
+          }
+        }
 
         if (colDef.required && isEmpty) {
           errors.push(`الحقل "${colDef.label.replace(' *','')}" مطلوب`);
@@ -2894,12 +2900,19 @@ router.post('/import/validate/:module', authenticateToken, upload.single('file')
         if (isEmpty) { rowData[colDef.key] = null; continue; }
 
         if (colDef.type === 'number') {
-          const num = Number(value);
+          const cleanNumStr = typeof value === 'string' ? value.replace(/,/g, '').trim() : value;
+          const num = Number(cleanNumStr);
           if (isNaN(num)) { errors.push(`"${colDef.label.replace(' *','')}" يجب أن يكون رقماً`); }
           else value = num;
         }
 
         if (colDef.type === 'select' && colDef.options) {
+          let strVal = String(value).trim();
+          if (colDef.key === 'payment_terms') {
+            if (['آجل', 'اجل', 'ذمم', 'ائتمان'].includes(strVal)) strVal = 'credit';
+            else if (['نقدي', 'نقدى', 'نقداً', 'كاش'].includes(strVal)) strVal = 'cash';
+            value = strVal;
+          }
           if (!colDef.options.includes(String(value))) {
             errors.push(`"${colDef.label.replace(' *','')}" يجب أن يكون أحد: ${colDef.options.join(' | ')}`);
           }
