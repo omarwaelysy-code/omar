@@ -332,6 +332,39 @@ export const StockAdjustments: React.FC = () => {
     setPage(1);
   };
 
+  const getCurrentAdjData = (): StockAdjustment => {
+    const adjAcc = accounts.find(a => a.id === formData.account_id);
+    const resolvedItems = items.map((item, idx) => {
+      const prod = products.find(p => p.id === item.product_id);
+      const wh = warehouses.find(w => w.id === item.warehouse_id);
+      const qty = Number(item.quantity) || 0;
+      const unitCost = Number(item.unit_cost) || 0;
+      return {
+        id: String(idx + 1),
+        adjustment_id: editingAdj?.id || '',
+        product_id: item.product_id,
+        product_code: prod?.code || '-',
+        product_name: prod?.name || '-',
+        warehouse_id: item.warehouse_id,
+        warehouse_name: wh?.name || '-',
+        quantity: qty,
+        unit_cost: unitCost,
+        total_cost: qty * unitCost,
+      };
+    });
+    return {
+      id: editingAdj?.id || '',
+      company_id: user?.company_id || '',
+      adjustment_number: editingAdj?.adjustment_number || (language === 'ar' ? 'جديد' : 'New'),
+      date: formData.date,
+      account_id: formData.account_id,
+      account_name: adjAcc ? `${adjAcc.code ? `${adjAcc.code} - ` : ''}${adjAcc.name}` : (editingAdj?.account_name || '-'),
+      entry_number: editingAdj?.entry_number,
+      description: formData.description,
+      items: resolvedItems,
+    } as any;
+  };
+
   const handlePrint = (adj: StockAdjustment) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -403,26 +436,52 @@ export const StockAdjustments: React.FC = () => {
 
   const handleExportDocPDF = (adj: StockAdjustment) => {
     const columns = [
-      { id: 'product_code', label: language === 'ar' ? 'رمز الصنف' : 'Code', width: 20 },
-      { id: 'product_name', label: language === 'ar' ? 'اسم الصنف' : 'Product', width: 35 },
+      { id: 'product_code', label: language === 'ar' ? 'رمز الصنف' : 'Code', width: 18 },
+      { id: 'product_name', label: language === 'ar' ? 'اسم الصنف' : 'Product', width: 32 },
       { id: 'warehouse_name', label: language === 'ar' ? 'المستودع' : 'Warehouse', width: 20 },
-      { id: 'quantity', label: language === 'ar' ? 'الكمية' : 'Qty', width: 10 },
-      { id: 'unit_cost', label: language === 'ar' ? 'تكلفة الوحدة' : 'Unit Cost', width: 15 }
+      { id: 'quantity', label: language === 'ar' ? 'فرق الكمية' : 'Qty Diff', width: 10 },
+      { id: 'unit_cost', label: language === 'ar' ? 'تكلفة الوحدة' : 'Unit Cost', width: 10 },
+      { id: 'total_cost', label: language === 'ar' ? 'قيمة الفرق' : 'Diff Value', width: 10 }
     ];
 
-    const rows = (adj.items || []).map(item => ({
-      product_code: item.product_code || '-',
-      product_name: item.product_name || '-',
-      warehouse_name: item.warehouse_name || '-',
-      quantity: formatNumber(item.quantity),
-      unit_cost: formatNumber(item.unit_cost)
-    }));
+    const rows = (adj.items || []).map(item => {
+      const totalCost = item.total_cost !== undefined && item.total_cost !== null
+        ? Number(item.total_cost)
+        : (Number(item.quantity || 0) * Number(item.unit_cost || 0));
+      return {
+        product_code: item.product_code || '-',
+        product_name: item.product_name || '-',
+        warehouse_name: item.warehouse_name || '-',
+        quantity: formatNumber(item.quantity),
+        unit_cost: formatNumber(item.unit_cost),
+        total_cost: formatNumber(totalCost)
+      };
+    });
+
+    const totalVal = (adj.items || []).reduce((sum, item) => {
+      const c = item.total_cost !== undefined && item.total_cost !== null
+        ? Number(item.total_cost)
+        : (Number(item.quantity || 0) * Number(item.unit_cost || 0));
+      return sum + (isNaN(c) ? 0 : c);
+    }, 0);
+
+    const adjAcc = accounts.find(a => a.id === adj.account_id);
+    const accName = adj.account_name || (adjAcc ? `${adjAcc.code ? `${adjAcc.code} - ` : ''}${adjAcc.name}` : '-');
+
+    const metaItems: Array<{ label: string; val: string }> = [
+      { label: language === 'ar' ? 'تاريخ التسوية' : 'Adjustment Date', val: formatDate(adj.date) },
+      ...(adj.entry_number ? [{ label: language === 'ar' ? 'رقم القيد المرتبط' : 'Linked Journal Entry', val: adj.entry_number }] : []),
+      { label: language === 'ar' ? 'حساب التسوية المقابل (دائن / مدين)' : 'Offset Account', val: accName }
+    ];
 
     exportToPDFUtil(tableRef.current || document.body, {
       filename: `Stock_Adjustment_${adj.adjustment_number}`,
       reportTitle: `${language === 'ar' ? 'تسوية كميات وأسعار المخزون' : 'Stock Adjustment'} - ${adj.adjustment_number}`,
+      metaItems,
+      description: adj.description || '',
       columns,
-      rows
+      rows,
+      totals: { total_cost: formatNumber(totalVal) }
     });
   };
 
@@ -662,7 +721,43 @@ export const StockAdjustments: React.FC = () => {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={() => handleCopyAdj(getCurrentAdjData())}
+                className="px-2.5 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 rounded-lg transition-all font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95"
+                title={language === 'ar' ? 'نسخ المستند كمسودة جديدة' : 'Copy Document'}
+              >
+                <Copy size={13} />
+                <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePrint(getCurrentAdjData())}
+                className="px-2.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 rounded-lg transition-all font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95"
+                title={language === 'ar' ? 'طباعة' : 'Print'}
+              >
+                <Printer size={13} />
+                <span>{language === 'ar' ? 'طباعة' : 'Print'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExportDocPDF(getCurrentAdjData())}
+                className="px-2.5 py-1.5 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 rounded-lg transition-all font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95"
+                title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
+              >
+                <FileText size={13} />
+                <span>{language === 'ar' ? 'تصدير PDF' : 'Export PDF'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExportDocExcel(getCurrentAdjData())}
+                className="px-2.5 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 rounded-lg transition-all font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95"
+                title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+              >
+                <FileSpreadsheet size={13} />
+                <span>{language === 'ar' ? 'تصدير إكسيل' : 'Export Excel'}</span>
+              </button>
               <button
                 type="button"
                 onClick={() => { setIsModalOpen(false); setEditingAdj(null); }}
