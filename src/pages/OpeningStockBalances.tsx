@@ -483,6 +483,42 @@ export const OpeningStockBalances: React.FC = () => {
     setPage(1);
   };
 
+  const getCurrentDocData = (): OpeningStockBalance => {
+    const debitAcc = accounts.find(a => a.id === formData.debit_account_id);
+    const creditAcc = accounts.find(a => a.id === formData.credit_account_id);
+    const resolvedItems = items.map((item, idx) => {
+      const prod = products.find(p => p.id === item.product_id);
+      const wh = warehouses.find(w => w.id === item.warehouse_id);
+      const qty = Number(item.quantity) || 0;
+      const unitCost = Number(item.unit_cost) || 0;
+      return {
+        id: String(idx + 1),
+        document_id: editingDoc?.id || '',
+        product_id: item.product_id,
+        product_code: prod?.code || '-',
+        product_name: prod?.name || '-',
+        warehouse_id: item.warehouse_id,
+        warehouse_name: wh?.name || '-',
+        quantity: qty,
+        unit_cost: unitCost,
+        total_cost: qty * unitCost,
+      };
+    });
+    return {
+      id: editingDoc?.id || '',
+      company_id: user?.company_id || '',
+      document_number: editingDoc?.document_number || (language === 'ar' ? 'جديد' : 'New'),
+      date: formData.date,
+      debit_account_id: formData.debit_account_id,
+      debit_account_name: debitAcc ? `${debitAcc.code ? `${debitAcc.code} - ` : ''}${debitAcc.name}` : (editingDoc?.debit_account_name || '-'),
+      credit_account_id: formData.credit_account_id,
+      credit_account_name: creditAcc ? `${creditAcc.code ? `${creditAcc.code} - ` : ''}${creditAcc.name}` : (editingDoc?.credit_account_name || '-'),
+      entry_number: editingDoc?.entry_number,
+      description: formData.description,
+      items: resolvedItems,
+    } as any;
+  };
+
   const handlePrint = (doc: OpeningStockBalance) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -576,9 +612,23 @@ export const OpeningStockBalances: React.FC = () => {
 
     const totalVal = (doc.items || []).reduce((sum, i) => sum + Number(i.total_cost || 0), 0);
 
+    const debitAcc = accounts.find(a => a.id === doc.debit_account_id);
+    const creditAcc = accounts.find(a => a.id === doc.credit_account_id);
+    const debitName = doc.debit_account_name || (debitAcc ? `${debitAcc.code ? `${debitAcc.code} - ` : ''}${debitAcc.name}` : '-');
+    const creditName = doc.credit_account_name || (creditAcc ? `${creditAcc.code ? `${creditAcc.code} - ` : ''}${creditAcc.name}` : '-');
+
+    const metaItems: Array<{ label: string; val: string }> = [
+      { label: language === 'ar' ? 'تاريخ السند' : 'Document Date', val: formatDate(doc.date) },
+      ...(doc.entry_number ? [{ label: language === 'ar' ? 'رقم القيد المرتبط' : 'Linked Journal Entry', val: doc.entry_number }] : []),
+      { label: language === 'ar' ? 'الحساب المدين (المخزون)' : 'Debit Account (Inventory)', val: debitName },
+      { label: language === 'ar' ? 'الحساب الدائن (مقابل أول المدة)' : 'Credit Account (Opening Offset)', val: creditName }
+    ];
+
     exportToPDFUtil(tableRef.current || document.body, {
       filename: `Opening_Stock_${doc.document_number}`,
       reportTitle: `${language === 'ar' ? 'سند رصيد أول المدة للمخزون' : 'Opening Stock Balance Receipt'} - ${doc.document_number}`,
+      metaItems,
+      description: doc.description || '',
       columns,
       rows,
       totals: { total_cost: formatNumber(totalVal) }
@@ -854,7 +904,43 @@ export const OpeningStockBalances: React.FC = () => {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={() => handleCopyDoc(getCurrentDocData())}
+                className="px-2.5 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 rounded-lg transition-all font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95"
+                title={language === 'ar' ? 'نسخ المستند كمسودة جديدة' : 'Copy Document'}
+              >
+                <Copy size={13} />
+                <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePrint(getCurrentDocData())}
+                className="px-2.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 rounded-lg transition-all font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95"
+                title={language === 'ar' ? 'طباعة' : 'Print'}
+              >
+                <Printer size={13} />
+                <span>{language === 'ar' ? 'طباعة' : 'Print'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExportDocPDF(getCurrentDocData())}
+                className="px-2.5 py-1.5 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 rounded-lg transition-all font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95"
+                title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
+              >
+                <FileText size={13} />
+                <span>{language === 'ar' ? 'تصدير PDF' : 'Export PDF'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExportDocExcel(getCurrentDocData())}
+                className="px-2.5 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 rounded-lg transition-all font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95"
+                title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+              >
+                <FileSpreadsheet size={13} />
+                <span>{language === 'ar' ? 'تصدير إكسيل' : 'Export Excel'}</span>
+              </button>
               <button
                 type="button"
                 onClick={() => { setIsModalOpen(false); setEditingDoc(null); }}
