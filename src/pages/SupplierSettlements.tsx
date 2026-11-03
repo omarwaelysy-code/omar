@@ -318,7 +318,7 @@ export const SupplierSettlements: React.FC = () => {
     return [...voucherSettlements, ...returnSettlements, ...jeSettlements, ...invoiceSideSettlements];
   };
 
-  const getSettlementsForTarget = (targetId: string, jeRefType?: string) => {
+  const getSettlementsForTarget = (targetId: string, jeRefType?: string, entityId: string = selectedSupplierId) => {
     let settledSum = 0;
     
     // Sum from purchase invoices
@@ -326,7 +326,7 @@ export const SupplierSettlements: React.FC = () => {
       if (inv.settlements && Array.isArray(inv.settlements)) {
         inv.settlements.forEach((s: any) => {
           if (editingSettlementNum && s.settlement_number === editingSettlementNum) return;
-          if (s.target_id === targetId || (jeRefType === 'opening_balance' && s.target_id === `OPEN-${selectedSupplierId}`)) {
+          if (s.target_id === targetId || (jeRefType === 'opening_balance' && s.target_id === `OPEN-${entityId}`)) {
             settledSum += Number(s.settled_amount) || 0;
           }
         });
@@ -340,7 +340,7 @@ export const SupplierSettlements: React.FC = () => {
           if (item.settlements && Array.isArray(item.settlements)) {
             item.settlements.forEach((s: any) => {
               if (editingSettlementNum && s.settlement_number === editingSettlementNum) return;
-              if (s.target_id === targetId || (jeRefType === 'opening_balance' && s.target_id === `OPEN-${selectedSupplierId}`)) {
+              if (s.target_id === targetId || (jeRefType === 'opening_balance' && s.target_id === `OPEN-${entityId}`)) {
                 settledSum += Number(s.settled_amount) || 0;
               }
             });
@@ -351,6 +351,121 @@ export const SupplierSettlements: React.FC = () => {
 
     return settledSum;
   };
+
+  const eligibleSuppliers = useMemo(() => {
+    const standardTypes = ['invoice', 'purchase_invoice', 'receipt', 'payment', 'return', 'purchase_return', 'receipt_voucher', 'payment_voucher'];
+
+    return suppliers.filter(supplier => {
+      const supId = supplier.id;
+      if (supId === selectedSupplierId) return true;
+
+      // 1. Check Purchase Invoices
+      const hasOpenInvoice = allPurchaseInvoices.some(inv => {
+        if (inv.supplier_id !== supId || inv.payment_type === 'cash') return false;
+        let docCurrency = systemCurrency;
+        if (inv.currency_id && currenciesMap[inv.currency_id]) {
+          docCurrency = currenciesMap[inv.currency_id].code;
+        } else if (inv.currency_code) {
+          docCurrency = inv.currency_code;
+        } else if (inv.currency) {
+          docCurrency = currenciesMap[inv.currency]?.code || inv.currency;
+        }
+        const docRate = Number(inv.exchange_rate) || 1;
+        const isForeign = docCurrency !== systemCurrency;
+        const baseAmount = isForeign
+          ? (Number(inv.total_base_amount) || (docRate > 0 && docRate !== 1 ? Number((Number(inv.total_amount || 0) * docRate).toFixed(2)) : Number(inv.total_amount || 0)))
+          : (Number(inv.total_amount) || 0);
+        const settlements = getInvoiceSettlements(inv);
+        const settledAmount = settlements
+          .filter((s: any) => s.settlement_number !== editingSettlementNum)
+          .reduce((sum, s) => sum + s.amount, 0);
+        return (baseAmount - settledAmount) > 0.01;
+      });
+      if (hasOpenInvoice) return true;
+
+      // 2. Check Payment Vouchers
+      const hasOpenPayment = allPayments.some(v => {
+        if (!v.items || !Array.isArray(v.items)) return false;
+        return v.items.some((item: any, idx: number) => {
+          if (!(item.entity_id === supId || item.supplier_id === supId || (item.type === 'supplier' && item.entity_id === supId))) return false;
+          let vCurrency = systemCurrency;
+          let vRate = Number(v.exchange_rate) || 1;
+          if (v.currency_id && currenciesMap[v.currency_id]) {
+            vCurrency = currenciesMap[v.currency_id].code;
+          } else if (v.currency_code) {
+            vCurrency = v.currency_code;
+          } else if (v.currency) {
+            vCurrency = currenciesMap[v.currency]?.code || v.currency;
+          } else if (item.currency && item.currency !== 'local' && item.currency !== systemCurrency) {
+            vCurrency = currenciesMap[item.currency]?.code || item.currency;
+            if (item.exchange_rate) vRate = Number(item.exchange_rate);
+          }
+          const isForeign = vCurrency !== systemCurrency;
+          const baseAmount = isForeign
+            ? (Number(item.base_amount) || (vRate > 0 && vRate !== 1 ? Number((Number(item.amount || 0) * vRate).toFixed(2)) : Number(item.amount || 0)))
+            : Number(item.amount || 0);
+
+          let totalSettled = 0;
+          const countedInvoiceIds = new Set<string>();
+          if (item.settlements && Array.isArray(item.settlements)) {
+            item.settlements.forEach((s: any) => {
+              if (editingSettlementNum && s.settlement_number === editingSettlementNum) return;
+              totalSettled += Number(s.settled_amount || s.amount || 0);
+              countedInvoiceIds.add(s.target_id);
+            });
+          }
+          allPurchaseInvoices.forEach(inv => {
+            if (inv.settlements && Array.isArray(inv.settlements)) {
+              inv.settlements.forEach((s: any) => {
+                if (editingSettlementNum && s.settlement_number === editingSettlementNum) return;
+                if (s.target_id === `${v.id}-${idx}` && !countedInvoiceIds.has(inv.id)) {
+                  totalSettled += Number(s.settled_amount || s.amount || 0);
+                }
+              });
+            }
+          });
+          return (baseAmount - totalSettled) > 0.01;
+        });
+      });
+      if (hasOpenPayment) return true;
+
+      // 3. Check Purchase Returns
+      const hasOpenReturn = allPurchaseReturns.some(r => {
+        if (r.supplier_id !== supId || r.payment_type === 'cash') return false;
+        let retCurrency = systemCurrency;
+        let retRate = Number(r.exchange_rate) || 1;
+        if (r.currency_id && currenciesMap[r.currency_id]) {
+          retCurrency = currenciesMap[r.currency_id].code;
+        } else if (r.currency_code) {
+          retCurrency = r.currency_code;
+        } else if (r.currency) {
+          retCurrency = currenciesMap[r.currency]?.code || r.currency;
+        }
+        const isForeign = retCurrency !== systemCurrency;
+        const baseAmount = isForeign
+          ? (Number(r.total_base_amount) || (retRate > 0 && retRate !== 1 ? Number((Number(r.total_amount || 0) * retRate).toFixed(2)) : Number(r.total_amount || 0)))
+          : (Number(r.total_amount) || 0);
+        const settled = getSettlementsForTarget(r.id, undefined, supId);
+        return (baseAmount - settled) > 0.01;
+      });
+      if (hasOpenReturn) return true;
+
+      // 4. Check Journal Entries (Debit or Credit)
+      const hasOpenJe = allJournalEntries.some(je => {
+        if (je.reference_type && standardTypes.includes(je.reference_type)) return false;
+        if (!je.items || !Array.isArray(je.items)) return false;
+        return je.items.some((item: any, idx: number) => {
+          const matchesEntity = item.supplier_id === supId || item.sub_account_id === supId;
+          if (!matchesEntity) return false;
+          const amount = Number(item.debit) > 0 ? Number(item.debit) : (Number(item.credit) > 0 ? Number(item.credit) : 0);
+          if (amount <= 0 || !isSupplierAccount(item.account_id, supplier, accounts)) return false;
+          const settled = getSettlementsForTarget(`${je.id}-${idx}`, je.reference_type, supId);
+          return (amount - settled) > 0.01;
+        });
+      });
+      return hasOpenJe;
+    });
+  }, [suppliers, selectedSupplierId, allPurchaseInvoices, allPayments, allPurchaseReturns, allJournalEntries, accounts, editingSettlementNum, currenciesMap, systemCurrency]);
 
   const getJournalEntryNumber = (docId: string, docNumber: string, pageName: string) => {
     const je = allJournalEntries.find((je: any) => 
@@ -2050,7 +2165,7 @@ export const SupplierSettlements: React.FC = () => {
               <div>
                 <label className="block text-[11px] font-bold text-zinc-500 tracking-tighter mb-1 px-1 uppercase">{t('discounts.column_supplier')}</label>
                 <SearchableSelect 
-                  options={suppliers.map(s => ({
+                  options={eligibleSuppliers.map(s => ({
                     value: s.id,
                     label: s.name,
                     code: s.code,
