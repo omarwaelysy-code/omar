@@ -288,40 +288,168 @@ export const WarehouseTransfers: React.FC = () => {
     setPage(1);
   };
 
+  const getCurrentTransferData = (): WarehouseTransfer => {
+    const fromWh = warehouses.find(w => w.id === formData.from_warehouse_id);
+    const toWh = warehouses.find(w => w.id === formData.to_warehouse_id);
+    const resolvedItems = items.map((item, idx) => {
+      const prod = products.find(p => p.id === item.product_id);
+      return {
+        id: String(idx + 1),
+        transfer_id: editingTransfer?.id || '',
+        product_id: item.product_id,
+        product_code: prod?.code || '-',
+        product_name: prod?.name || '-',
+        quantity: Number(item.quantity) || 0,
+      };
+    });
+    return {
+      id: editingTransfer?.id || '',
+      company_id: user?.company_id || '',
+      transfer_number: editingTransfer?.transfer_number || (language === 'ar' ? 'جديد' : 'New'),
+      date: formData.date,
+      from_warehouse_id: formData.from_warehouse_id,
+      from_warehouse_name: fromWh?.name || editingTransfer?.from_warehouse_name || '-',
+      to_warehouse_id: formData.to_warehouse_id,
+      to_warehouse_name: toWh?.name || editingTransfer?.to_warehouse_name || '-',
+      description: formData.description,
+      created_by: editingTransfer?.created_by || user?.name || '-',
+      items: resolvedItems,
+    } as any;
+  };
+
+  const handlePrintTransfer = (transfer: WarehouseTransfer) => {
+    const companyName = localStorage.getItem('company_name') || 'نظام ERP السحابي';
+    const printWindow = window.open('', '_blank', 'width=1000,height=800');
+    if (!printWindow) return;
+
+    const transferItems = ((transfer as any).items || []).map((item: any, idx: number) => {
+      const prod = products.find(p => p.id === item.product_id);
+      return {
+        index: idx + 1,
+        code: item.product_code || prod?.code || '-',
+        name: item.product_name || prod?.name || '-',
+        quantity: formatNumber(item.quantity),
+        unit: prod?.unit || '-'
+      };
+    });
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html dir="${dir}" lang="${language}">
+        <head>
+          <meta charset="utf-8" />
+          <title>${language === 'ar' ? `سند تحويل مخزني - ${transfer.transfer_number}` : `Warehouse Transfer - ${transfer.transfer_number}`}</title>
+          <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; direction: ${dir}; padding: 30px; color: #1e293b; background: #fff; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f766e; padding-bottom: 16px; margin-bottom: 20px; }
+            .company { font-size: 18px; font-weight: bold; color: #0f766e; }
+            .title { font-size: 22px; font-weight: bold; color: #0f172a; }
+            .doc-num { font-size: 16px; font-weight: bold; color: #0f766e; background: #f0fdf4; padding: 6px 12px; border-radius: 8px; border: 1px solid #bbf7d0; }
+            .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; background: #f8fafc; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 24px; }
+            .info-item { font-size: 13px; }
+            .info-label { font-weight: bold; color: #64748b; margin-left: 6px; }
+            .info-value { font-weight: bold; color: #0f172a; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 24px; text-align: ${dir === 'rtl' ? 'right' : 'left'}; }
+            th, td { border: 1px solid #cbd5e1; padding: 10px 12px; font-size: 13px; }
+            th { background-color: #f1f5f9; font-weight: bold; color: #0f172a; }
+            tr:nth-child(even) { background-color: #f8fafc; }
+            .text-center { text-align: center; }
+            .footer { margin-top: 30px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <div class="company">${companyName}</div>
+              <div class="title">${language === 'ar' ? 'سند تحويل مخزني' : 'Warehouse Transfer Document'}</div>
+            </div>
+            <div class="doc-num">${transfer.transfer_number}</div>
+          </div>
+          <div class="info-grid">
+            <div class="info-item"><span class="info-label">${language === 'ar' ? 'التاريخ:' : 'Date:'}</span> <span class="info-value">${formatDate(transfer.date)}</span></div>
+            <div class="info-item"><span class="info-label">${language === 'ar' ? 'بواسطة:' : 'Created By:'}</span> <span class="info-value">${transfer.created_by || '-'}</span></div>
+            <div class="info-item"><span class="info-label">${language === 'ar' ? 'من مخزن (المصدر):' : 'From Warehouse:'}</span> <span class="info-value" style="color:#e11d48">${transfer.from_warehouse_name || '-'}</span></div>
+            <div class="info-item"><span class="info-label">${language === 'ar' ? 'إلى مخزن (الوجهة):' : 'To Warehouse:'}</span> <span class="info-value" style="color:#059669">${transfer.to_warehouse_name || '-'}</span></div>
+            <div class="info-item" style="grid-column: span 2;"><span class="info-label">${language === 'ar' ? 'ملاحظات / بيان:' : 'Notes:'}</span> <span class="info-value">${transfer.description || '-'}</span></div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th class="text-center" style="width: 50px;">#</th>
+                <th>${language === 'ar' ? 'كود الصنف' : 'Code'}</th>
+                <th>${language === 'ar' ? 'اسم الصنف' : 'Product Name'}</th>
+                <th class="text-center">${language === 'ar' ? 'الكمية' : 'Quantity'}</th>
+                <th class="text-center">${language === 'ar' ? 'الوحدة' : 'Unit'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${transferItems.map((item: any) => `
+                <tr>
+                  <td class="text-center">${item.index}</td>
+                  <td>${item.code}</td>
+                  <td><strong>${item.name}</strong></td>
+                  <td class="text-center"><strong>${item.quantity}</strong></td>
+                  <td class="text-center">${item.unit}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <div class="footer">${language === 'ar' ? 'تاريخ الطباعة:' : 'Printed on:'} ${new Date().toLocaleDateString('ar-EG')} - ${new Date().toLocaleTimeString('ar-EG')}</div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   const handleExportDocPDF = (transfer: WarehouseTransfer) => {
     const columns = [
-      { id: 'product_code', label: language === 'ar' ? 'كود الصنف' : 'Code', width: 25 },
-      { id: 'product_name', label: language === 'ar' ? 'اسم الصنف' : 'Product Name', width: 50 },
-      { id: 'quantity', label: language === 'ar' ? 'الكمية' : 'Qty', width: 25 }
+      { id: 'product_code', label: language === 'ar' ? 'كود الصنف' : 'Code', width: 25, align: 'center' as const },
+      { id: 'product_name', label: language === 'ar' ? 'اسم الصنف' : 'Product Name', width: 50, align: 'right' as const },
+      { id: 'quantity', label: language === 'ar' ? 'الكمية' : 'Qty', width: 25, align: 'center' as const }
     ];
 
-    const rows = ((transfer as any).items || []).map((item: any) => ({
-      product_code: item.product_code || '-',
-      product_name: item.product_name || '-',
-      quantity: formatNumber(item.quantity)
-    }));
+    const rows = ((transfer as any).items || []).map((item: any) => {
+      const prod = products.find(p => p.id === item.product_id);
+      return {
+        product_code: item.product_code || prod?.code || '-',
+        product_name: item.product_name || prod?.name || '-',
+        quantity: formatNumber(item.quantity)
+      };
+    });
+
+    const detailsTitle = `${language === 'ar' ? 'التاريخ' : 'Date'}: ${formatDate(transfer.date)} | ${language === 'ar' ? 'من مخزن' : 'From'}: ${transfer.from_warehouse_name || '-'} | ${language === 'ar' ? 'إلى مخزن' : 'To'}: ${transfer.to_warehouse_name || '-'}`;
 
     exportToPDFUtil(tableRef.current || document.body, {
       filename: `Warehouse_Transfer_${transfer.transfer_number}`,
       reportTitle: `${language === 'ar' ? 'سند تحويل مخزني' : 'Warehouse Transfer Document'} - ${transfer.transfer_number}`,
+      detailsTitle,
       columns,
       rows
     });
   };
 
   const handleExportDocExcel = (transfer: WarehouseTransfer) => {
-    const items = ((transfer as any).items || []).map((item: any, idx: number) => ({
-      '#': idx + 1,
-      [language === 'ar' ? 'رقم التحويل' : 'Transfer Number']: transfer.transfer_number,
-      [language === 'ar' ? 'التاريخ' : 'Date']: formatDate(transfer.date),
-      [language === 'ar' ? 'من مخزن' : 'From Warehouse']: transfer.from_warehouse_name || '-',
-      [language === 'ar' ? 'إلى مخزن' : 'To Warehouse']: transfer.to_warehouse_name || '-',
-      [language === 'ar' ? 'رمز الصنف' : 'Product Code']: item.product_code || '-',
-      [language === 'ar' ? 'اسم الصنف' : 'Product Name']: item.product_name || '-',
-      [language === 'ar' ? 'الكمية' : 'Quantity']: item.quantity
-    }));
+    const exportItems = ((transfer as any).items || []).map((item: any, idx: number) => {
+      const prod = products.find(p => p.id === item.product_id);
+      return {
+        '#': idx + 1,
+        [language === 'ar' ? 'رقم التحويل' : 'Transfer Number']: transfer.transfer_number,
+        [language === 'ar' ? 'التاريخ' : 'Date']: formatDate(transfer.date),
+        [language === 'ar' ? 'من مخزن' : 'From Warehouse']: transfer.from_warehouse_name || '-',
+        [language === 'ar' ? 'إلى مخزن' : 'To Warehouse']: transfer.to_warehouse_name || '-',
+        [language === 'ar' ? 'رمز الصنف' : 'Product Code']: item.product_code || prod?.code || '-',
+        [language === 'ar' ? 'اسم الصنف' : 'Product Name']: item.product_name || prod?.name || '-',
+        [language === 'ar' ? 'الكمية' : 'Quantity']: item.quantity
+      };
+    });
 
-    exportToExcel(items, `Warehouse_Transfer_${transfer.transfer_number}`);
+    exportToExcel(exportItems, `Warehouse_Transfer_${transfer.transfer_number}`);
   };
 
   const handleCopyTransfer = (transfer: WarehouseTransfer) => {
@@ -404,11 +532,12 @@ export const WarehouseTransfers: React.FC = () => {
                 <span>{language === 'ar' ? 'تصدير إكسيل' : 'Export Excel'}</span>
               </button>
               <button
-                onClick={() => printElement(document.getElementById('view-transfer-content') || document.body, `سند تحويل مخزني ${viewTransfer.transfer_number}`)}
-                className="p-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg transition-all shadow-sm active:scale-95"
+                onClick={() => handlePrintTransfer(viewTransfer)}
+                className="px-2.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 rounded-lg transition-all font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95"
                 title={language === 'ar' ? 'طباعة' : 'Print'}
               >
-                <Printer size={15} />
+                <Printer size={13} />
+                <span>{language === 'ar' ? 'طباعة' : 'Print'}</span>
               </button>
               <button
                 type="button"
@@ -521,7 +650,43 @@ export const WarehouseTransfers: React.FC = () => {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={() => handleCopyTransfer(getCurrentTransferData())}
+                className="px-2.5 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 rounded-lg transition-all font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95"
+                title={language === 'ar' ? 'نسخ المستند كمسودة جديدة' : 'Copy Document'}
+              >
+                <Copy size={13} />
+                <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePrintTransfer(getCurrentTransferData())}
+                className="px-2.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 rounded-lg transition-all font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95"
+                title={language === 'ar' ? 'طباعة' : 'Print'}
+              >
+                <Printer size={13} />
+                <span>{language === 'ar' ? 'طباعة' : 'Print'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExportDocPDF(getCurrentTransferData())}
+                className="px-2.5 py-1.5 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 rounded-lg transition-all font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95"
+                title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
+              >
+                <FileText size={13} />
+                <span>{language === 'ar' ? 'تصدير PDF' : 'Export PDF'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExportDocExcel(getCurrentTransferData())}
+                className="px-2.5 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 rounded-lg transition-all font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95"
+                title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+              >
+                <FileSpreadsheet size={13} />
+                <span>{language === 'ar' ? 'تصدير إكسيل' : 'Export Excel'}</span>
+              </button>
               <button
                 type="button"
                 onClick={() => { setIsModalOpen(false); setEditingTransfer(null); }}

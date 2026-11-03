@@ -41,11 +41,12 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
     table = element.querySelector('table');
   }
   
-  let columns: Array<{ id: string; label: string; width?: number; align?: 'left' | 'center' | 'right' }> = [];
-  let rows: any[] = [];
-  let totals: { [key: string]: string } = {};
+  let columns: Array<{ id: string; label: string; width?: number; align?: 'left' | 'center' | 'right' }> = options.columns || [];
+  let rows: any[] = options.rows || [];
+  let totals: { [key: string]: string } = options.totals || {};
+  const hasExplicitData = Array.isArray(options.columns) && options.columns.length > 0 && Array.isArray(options.rows);
 
-  if (table) {
+  if (table && !hasExplicitData) {
     
     // Reconstruct columns from complex rowSpan/colSpan thead grid
     const headerRows = Array.from(table.querySelectorAll('thead tr'));
@@ -250,6 +251,10 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
   // 2.5 Filter out completely empty columns (delete excess empty columns)
   const nonEmptyColumnIds = new Set<string>();
   columns.forEach(col => {
+    if (hasExplicitData) {
+      nonEmptyColumnIds.add(col.id);
+      return;
+    }
     // Keep metadata/important text columns
     const isMeta = col.id === 'col_0' || col.id === 'col_1' || col.id === 'col_2' || col.id === 'col_3' || 
                    col.label.includes('كود') || col.label.includes('الاسم') || col.label.includes('اسم') || 
