@@ -4,6 +4,8 @@ export interface PDFOptions {
   orientation?: 'portrait' | 'landscape';
   reportTitle?: string;
   detailsTitle?: string;
+  description?: string;
+  metaItems?: Array<{ label: string; val: string }>;
   columns?: any[];
   rows?: any[];
   totals?: Record<string, any>;
@@ -290,6 +292,8 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
     company,
     reportTitle: options.reportTitle || 'تقرير النظام',
     detailsTitle: options.detailsTitle,
+    description: options.description,
+    metaItems: options.metaItems,
     summaryTable: options.summaryTable,
     columns,
     rows,

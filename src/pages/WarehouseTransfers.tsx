@@ -423,12 +423,20 @@ export const WarehouseTransfers: React.FC = () => {
       };
     });
 
-    const detailsTitle = `${language === 'ar' ? 'التاريخ' : 'Date'}: ${formatDate(transfer.date)} | ${language === 'ar' ? 'من مخزن' : 'From'}: ${transfer.from_warehouse_name || '-'} | ${language === 'ar' ? 'إلى مخزن' : 'To'}: ${transfer.to_warehouse_name || '-'}`;
+    const fromWhName = transfer.from_warehouse_name || warehouses.find(w => w.id === transfer.from_warehouse_id)?.name || '-';
+    const toWhName = transfer.to_warehouse_name || warehouses.find(w => w.id === transfer.to_warehouse_id)?.name || '-';
+
+    const metaItems: Array<{ label: string; val: string }> = [
+      { label: language === 'ar' ? 'تاريخ التحويل' : 'Transfer Date', val: formatDate(transfer.date) },
+      { label: language === 'ar' ? 'المخزن المحول منه (المصدر)' : 'From Warehouse (Source)', val: fromWhName },
+      { label: language === 'ar' ? 'المخزن المحول إليه (الوجهة)' : 'To Warehouse (Destination)', val: toWhName }
+    ];
 
     exportToPDFUtil(tableRef.current || document.body, {
       filename: `Warehouse_Transfer_${transfer.transfer_number}`,
       reportTitle: `${language === 'ar' ? 'سند تحويل مخزني' : 'Warehouse Transfer Document'} - ${transfer.transfer_number}`,
-      detailsTitle,
+      metaItems,
+      description: transfer.description || '',
       columns,
       rows
     });

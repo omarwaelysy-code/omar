@@ -532,12 +532,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           }
 
           if (!isThermal) {
-            currentY += 40; // Advance currentY past header title
-          }
-
-
-          if (!isThermal) {
-            currentY += 50; // Advance currentY past header texts to prevent overlapping
+            currentY += logoBuffer ? 55 : 35; // Advance currentY past header title
           }
         }
 
@@ -1907,6 +1902,45 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           const totals = dto.totals || {};
 
           drawHeader(title, dto.branchName, dto.userName);
+
+          if (Array.isArray(dto.metaItems) && dto.metaItems.length > 0) {
+            drawMetaGrid(dto.metaItems);
+          }
+
+          if (dto.description && String(dto.description).trim() !== '') {
+            const fontLabel = 'ArabicRegular';
+            const fontVal = 'ArabicBold';
+            const sizeLabel = isThermal ? 7.5 : 8.5;
+            const sizeVal = isThermal ? 7.5 : 9.5;
+            const wrappedDesc = wrapText(doc, String(dto.description).trim(), usableWidth - (isThermal ? 8 : 20), fontVal, sizeVal);
+            const boxHeight = (isThermal ? 10 : 12) + wrappedDesc.length * (isThermal ? 9.5 : 11) + (isThermal ? 6 : 10);
+
+            if (!isThermal && (currentY + boxHeight > doc.page.height - 50)) {
+              addNewPage();
+              currentY = 40;
+            }
+
+            doc.fillColor('#f9fafb').rect(sideMargin, currentY, usableWidth, boxHeight).fill();
+            doc.strokeColor('#e5e7eb').lineWidth(0.5).rect(sideMargin, currentY, usableWidth, boxHeight).stroke();
+            doc.fillColor('#4b5563');
+            renderText(isRtl ? 'ملاحظات / بيان:' : 'Notes / Description:', sideMargin + (isThermal ? 4 : 10), currentY + 5, {
+              width: usableWidth - (isThermal ? 8 : 20),
+              align: isRtl ? 'right' : 'left',
+              font: fontLabel,
+              size: sizeLabel
+            });
+            doc.fillColor('#1f2937');
+            wrappedDesc.forEach((line, lineIndex) => {
+              renderText(line, sideMargin + (isThermal ? 4 : 10), currentY + (isThermal ? 14 : 16) + lineIndex * (isThermal ? 9.5 : 11), {
+                width: usableWidth - (isThermal ? 8 : 20),
+                align: isRtl ? 'right' : 'left',
+                font: fontVal,
+                size: sizeVal,
+                lineBreak: false
+              });
+            });
+            currentY += boxHeight + (isThermal ? 8 : 15);
+          }
 
           if (isReversalDoc || isReversed) {
             const stampCenterY = isThermal ? (currentY + 20) : (currentY + 40);
