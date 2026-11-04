@@ -58,12 +58,6 @@ export const ChequeDetailsModal: React.FC<ChequeDetailsModalProps> = ({
     }
   };
 
-  if (!isOpen || !cheque) return null;
-
-  const isForeign = cheque.currency && cheque.currency !== 'EGP';
-  const exchangeRate = Number(cheque.exchange_rate) || 1.0;
-  const equivalentEgp = isForeign ? Number(cheque.amount) * exchangeRate : Number(cheque.amount);
-
   const matchedBank = React.useMemo<EgyptianBank | null>(() => {
     if (!cheque) return null;
     const nameToSearch = (cheque.bank_name || '').trim().toLowerCase();
@@ -80,6 +74,12 @@ export const ChequeDetailsModal: React.FC<ChequeDetailsModalProps> = ({
     }
     return null;
   }, [cheque]);
+
+  if (!isOpen || !cheque) return null;
+
+  const isForeign = cheque.currency && cheque.currency !== 'EGP';
+  const exchangeRate = Number(cheque.exchange_rate) || 1.0;
+  const equivalentEgp = isForeign ? Number(cheque.amount) * exchangeRate : Number(cheque.amount);
 
   const tafqeetText = isAr 
     ? tafqeetAr(Number(cheque.amount) || 0, cheque.currency || 'EGP')
