@@ -175,16 +175,69 @@ interface TemplatesProps {
   initialView?: 'list' | 'create';
 }
 
+const TEMPLATE_MENU_GROUPS = [
+  { id: 'sales', ar: 'قائمة المبيعات', en: 'Sales Menu' },
+  { id: 'purchases', ar: 'قائمة المشتريات', en: 'Purchases Menu' },
+  { id: 'warehouses', ar: 'قائمة المخازن', en: 'Warehouses Menu' },
+  { id: 'cash', ar: 'قائمة النقدية والبنوك', en: 'Cash & Banks Menu' },
+  { id: 'cheques', ar: 'قائمة الشيكات', en: 'Cheques Menu' },
+  { id: 'general_ledger', ar: 'قائمة الحسابات العامة', en: 'General Ledger Menu' },
+  { id: 'fixed_assets', ar: 'قائمة الأصول الثابتة', en: 'Fixed Assets Menu' },
+  { id: 'flexible_operations', ar: 'قائمة العمليات المرنة', en: 'Flexible Operations Menu' },
+  { id: 'eta', ar: 'قائمة الفاتورة الإلكترونية (ETA)', en: 'ETA e-Invoicing Menu' }
+] as const;
+
 const DOCUMENT_TYPES = [
-  { id: 'invoices', ar: 'فاتورة مبيعات / Sales Invoice', en: 'Sales Invoice' },
-  { id: 'purchase_invoices', ar: 'فاتورة مشتريات / Purchase Invoice', en: 'Purchase Invoice' },
-  { id: 'returns', ar: 'مرتجع مبيعات / Sales Return', en: 'Sales Return' },
-  { id: 'purchase_returns', ar: 'مرتجع مشتريات / Purchase Return', en: 'Purchase Return' },
-  { id: 'sales_orders', ar: 'أمر بيع / Sales Order', en: 'Sales Order' },
-  { id: 'purchase_orders', ar: 'أمر شراء / Purchase Order', en: 'Purchase Order' },
-  { id: 'receipt_vouchers', ar: 'سند قبض / Receipt Voucher', en: 'Receipt Voucher' },
-  { id: 'payment_vouchers', ar: 'سند صرف / Payment Voucher', en: 'Payment Voucher' },
-  { id: 'journal_entries', ar: 'قيد يومية / Journal Entry', en: 'Journal Entry' }
+  // 1. قائمة المبيعات
+  { id: 'invoices', menuId: 'sales', menuAr: 'قائمة المبيعات', menuEn: 'Sales Menu', ar: 'فاتورة مبيعات / Sales Invoice', en: 'Sales Invoice', defaultNameAr: 'فاتورة مبيعات - القالب الافتراضي', defaultNameEn: 'Sales Invoice - System Default' },
+  { id: 'sales_orders', menuId: 'sales', menuAr: 'قائمة المبيعات', menuEn: 'Sales Menu', ar: 'أمر بيع / Sales Order', en: 'Sales Order', defaultNameAr: 'أمر بيع - القالب الافتراضي', defaultNameEn: 'Sales Order - System Default' },
+  { id: 'returns', menuId: 'sales', menuAr: 'قائمة المبيعات', menuEn: 'Sales Menu', ar: 'مرتجع مبيعات / Sales Return', en: 'Sales Return', defaultNameAr: 'مرتجع مبيعات - القالب الافتراضي', defaultNameEn: 'Sales Return - System Default' },
+  { id: 'sales_import', menuId: 'sales', menuAr: 'قائمة المبيعات', menuEn: 'Sales Menu', ar: 'استيراد مستندات بيع / Import Sales Documents', en: 'Import Sales Documents', defaultNameAr: 'استيراد مستندات بيع - القالب الافتراضي', defaultNameEn: 'Import Sales Documents - System Default' },
+  { id: 'customer_discounts', menuId: 'sales', menuAr: 'قائمة المبيعات', menuEn: 'Sales Menu', ar: 'خصومات العملاء (إشعار دائن/مدين) / Customer Discounts', en: 'Customer Discounts', defaultNameAr: 'خصومات العملاء - القالب الافتراضي', defaultNameEn: 'Customer Discounts - System Default' },
+  { id: 'customer_settlements', menuId: 'sales', menuAr: 'قائمة المبيعات', menuEn: 'Sales Menu', ar: 'تسويات العملاء / Customer Settlements', en: 'Customer Settlements', defaultNameAr: 'تسويات العملاء - القالب الافتراضي', defaultNameEn: 'Customer Settlements - System Default' },
+
+  // 2. قائمة المشتريات
+  { id: 'purchase_invoices', menuId: 'purchases', menuAr: 'قائمة المشتريات', menuEn: 'Purchases Menu', ar: 'فاتورة مشتريات / Purchase Invoice', en: 'Purchase Invoice', defaultNameAr: 'فاتورة مشتريات - القالب الافتراضي', defaultNameEn: 'Purchase Invoice - System Default' },
+  { id: 'goods_receipts', menuId: 'purchases', menuAr: 'قائمة المشتريات', menuEn: 'Purchases Menu', ar: 'إذن استلام بضاعة / Goods Receipt', en: 'Goods Receipt', defaultNameAr: 'إذن استلام بضاعة - القالب الافتراضي', defaultNameEn: 'Goods Receipt - System Default' },
+  { id: 'purchase_orders', menuId: 'purchases', menuAr: 'قائمة المشتريات', menuEn: 'Purchases Menu', ar: 'أمر شراء / Purchase Order', en: 'Purchase Order', defaultNameAr: 'أمر شراء - القالب الافتراضي', defaultNameEn: 'Purchase Order - System Default' },
+  { id: 'purchase_returns', menuId: 'purchases', menuAr: 'قائمة المشتريات', menuEn: 'Purchases Menu', ar: 'مرتجع مشتريات / Purchase Return', en: 'Purchase Return', defaultNameAr: 'مرتجع مشتريات - القالب الافتراضي', defaultNameEn: 'Purchase Return - System Default' },
+  { id: 'purchases_import', menuId: 'purchases', menuAr: 'قائمة المشتريات', menuEn: 'Purchases Menu', ar: 'استيراد مستندات شراء / Import Purchase Documents', en: 'Import Purchase Documents', defaultNameAr: 'استيراد مستندات شراء - القالب الافتراضي', defaultNameEn: 'Import Purchase Documents - System Default' },
+  { id: 'supplier_discounts', menuId: 'purchases', menuAr: 'قائمة المشتريات', menuEn: 'Purchases Menu', ar: 'خصومات الموردين (خصم مكتسب) / Supplier Discounts', en: 'Supplier Discounts', defaultNameAr: 'خصومات الموردين - القالب الافتراضي', defaultNameEn: 'Supplier Discounts - System Default' },
+  { id: 'supplier_settlements', menuId: 'purchases', menuAr: 'قائمة المشتريات', menuEn: 'Purchases Menu', ar: 'تسويات الموردين / Supplier Settlements', en: 'Supplier Settlements', defaultNameAr: 'تسويات الموردين - القالب الافتراضي', defaultNameEn: 'Supplier Settlements - System Default' },
+
+  // 3. قائمة المخازن
+  { id: 'warehouse_goods_receipts', menuId: 'warehouses', menuAr: 'قائمة المخازن', menuEn: 'Warehouses Menu', ar: 'إذن استلام المخزون / Warehouse Goods Receipt', en: 'Warehouse Goods Receipt', defaultNameAr: 'إذن استلام المخزون - القالب الافتراضي', defaultNameEn: 'Warehouse Goods Receipt - System Default' },
+  { id: 'warehouse_transfers', menuId: 'warehouses', menuAr: 'قائمة المخازن', menuEn: 'Warehouses Menu', ar: 'تحويل بين المخازن / Warehouse Transfer', en: 'Warehouse Transfer', defaultNameAr: 'تحويل بين المخازن - القالب الافتراضي', defaultNameEn: 'Warehouse Transfer - System Default' },
+  { id: 'opening_stock_balances', menuId: 'warehouses', menuAr: 'قائمة المخازن', menuEn: 'Warehouses Menu', ar: 'أرصدة أول المدة للمخزون / Opening Stock Balances', en: 'Opening Stock Balances', defaultNameAr: 'أرصدة أول المدة للمخزون - القالب الافتراضي', defaultNameEn: 'Opening Stock Balances - System Default' },
+  { id: 'stock_adjustments', menuId: 'warehouses', menuAr: 'قائمة المخازن', menuEn: 'Warehouses Menu', ar: 'تسوية الأصناف (الجرد) / Stock Adjustments', en: 'Stock Adjustments', defaultNameAr: 'تسوية الأصناف - القالب الافتراضي', defaultNameEn: 'Stock Adjustments - System Default' },
+
+  // 4. قائمة النقدية والبنوك
+  { id: 'receipt_vouchers', menuId: 'cash', menuAr: 'قائمة النقدية والبنوك', menuEn: 'Cash & Banks Menu', ar: 'سند قبض / Receipt Voucher', en: 'Receipt Voucher', defaultNameAr: 'سند قبض - القالب الافتراضي', defaultNameEn: 'Receipt Voucher - System Default' },
+  { id: 'payment_vouchers', menuId: 'cash', menuAr: 'قائمة النقدية والبنوك', menuEn: 'Cash & Banks Menu', ar: 'سند صرف / Payment Voucher', en: 'Payment Voucher', defaultNameAr: 'سند صرف - القالب الافتراضي', defaultNameEn: 'Payment Voucher - System Default' },
+  { id: 'cash_transfers', menuId: 'cash', menuAr: 'قائمة النقدية والبنوك', menuEn: 'Cash & Banks Menu', ar: 'تحويل نقدي بين الخزائن والبنوك / Cash Transfer', en: 'Cash Transfer', defaultNameAr: 'تحويل نقدي بين الخزائن والبنوك - القالب الافتراضي', defaultNameEn: 'Cash Transfer - System Default' },
+
+  // 5. قائمة الشيكات
+  { id: 'issue_supplier_cheque', menuId: 'cheques', menuAr: 'قائمة الشيكات', menuEn: 'Cheques Menu', ar: 'تحرير شيك مورد / Issue Supplier Cheque', en: 'Issue Supplier Cheque', defaultNameAr: 'تحرير شيك مورد - القالب الافتراضي', defaultNameEn: 'Issue Supplier Cheque - System Default' },
+  { id: 'issue_other_cheque', menuId: 'cheques', menuAr: 'قائمة الشيكات', menuEn: 'Cheques Menu', ar: 'تحرير شيك لجهة أخرى / Issue Other Cheque', en: 'Issue Other Cheque', defaultNameAr: 'تحرير شيك لجهة أخرى - القالب الافتراضي', defaultNameEn: 'Issue Other Cheque - System Default' },
+  { id: 'issued_cheque_operations', menuId: 'cheques', menuAr: 'قائمة الشيكات', menuEn: 'Cheques Menu', ar: 'حركات الشيك الصادر (صرف / تأجيل / ارتداد / إلغاء) / Issued Cheque Operations', en: 'Issued Cheque Operations', defaultNameAr: 'حركات الشيك الصادر - القالب الافتراضي', defaultNameEn: 'Issued Cheque Operations - System Default' },
+  { id: 'receive_customer_cheque', menuId: 'cheques', menuAr: 'قائمة الشيكات', menuEn: 'Cheques Menu', ar: 'استلام شيك من عميل / Receive Customer Cheque', en: 'Receive Customer Cheque', defaultNameAr: 'استلام شيك من عميل - القالب الافتراضي', defaultNameEn: 'Receive Customer Cheque - System Default' },
+  { id: 'receive_other_cheque', menuId: 'cheques', menuAr: 'قائمة الشيكات', menuEn: 'Cheques Menu', ar: 'استلام شيك من جهة أخرى / Receive Other Cheque', en: 'Receive Other Cheque', defaultNameAr: 'استلام شيك من جهة أخرى - القالب الافتراضي', defaultNameEn: 'Receive Other Cheque - System Default' },
+  { id: 'received_cheque_operations', menuId: 'cheques', menuAr: 'قائمة الشيكات', menuEn: 'Cheques Menu', ar: 'حركات الشيك الوارد (إيداع / تحصيل / تظهير / ارتداد) / Received Cheque Operations', en: 'Received Cheque Operations', defaultNameAr: 'حركات الشيك الوارد - القالب الافتراضي', defaultNameEn: 'Received Cheque Operations - System Default' },
+
+  // 6. قائمة الحسابات العامة
+  { id: 'journal_entries', menuId: 'general_ledger', menuAr: 'قائمة الحسابات العامة', menuEn: 'General Ledger Menu', ar: 'قيد يومية / Journal Entry', en: 'Journal Entry', defaultNameAr: 'قيد يومية - القالب الافتراضي', defaultNameEn: 'Journal Entry - System Default' },
+  { id: 'journal_reversal', menuId: 'general_ledger', menuAr: 'قائمة الحسابات العامة', menuEn: 'General Ledger Menu', ar: 'عكس قيد يومية / Journal Reversal', en: 'Journal Reversal', defaultNameAr: 'عكس قيد يومية - القالب الافتراضي', defaultNameEn: 'Journal Reversal - System Default' },
+
+  // 7. قائمة الأصول الثابتة
+  { id: 'fixed_asset_capitalization', menuId: 'fixed_assets', menuAr: 'قائمة الأصول الثابتة', menuEn: 'Fixed Assets Menu', ar: 'تسجيل ورسملة أصل ثابت / Capitalize Fixed Asset', en: 'Capitalize Fixed Asset', defaultNameAr: 'تسجيل ورسملة أصل ثابت - القالب الافتراضي', defaultNameEn: 'Capitalize Fixed Asset - System Default' },
+  { id: 'asset_depreciation', menuId: 'fixed_assets', menuAr: 'قائمة الأصول الثابتة', menuEn: 'Fixed Assets Menu', ar: 'تشغيل الإهلاك الدوري / Run Asset Depreciation', en: 'Run Asset Depreciation', defaultNameAr: 'تشغيل الإهلاك الدوري - القالب الافتراضي', defaultNameEn: 'Run Asset Depreciation - System Default' },
+  { id: 'fixed_asset_operations', menuId: 'fixed_assets', menuAr: 'قائمة الأصول الثابتة', menuEn: 'Fixed Assets Menu', ar: 'حركات الأصل الثابت (نقل / صيانة / تقييم / استبعاد) / Fixed Asset Operations', en: 'Fixed Asset Operations', defaultNameAr: 'حركات الأصل الثابت - القالب الافتراضي', defaultNameEn: 'Fixed Asset Operations - System Default' },
+
+  // 8. قائمة العمليات المرنة
+  { id: 'flexible_operations', menuId: 'flexible_operations', menuAr: 'قائمة العمليات المرنة', menuEn: 'Flexible Operations Menu', ar: 'تسجيل عملية مخصصة / Flexible Operation', en: 'Flexible Operation', defaultNameAr: 'تسجيل عملية مخصصة - القالب الافتراضي', defaultNameEn: 'Flexible Operation - System Default' },
+
+  // 9. قائمة الفاتورة الإلكترونية (ETA)
+  { id: 'eta_documents', menuId: 'eta', menuAr: 'قائمة الفاتورة الإلكترونية (ETA)', menuEn: 'ETA e-Invoicing Menu', ar: 'الوثائق الإلكترونية (ETA) / ETA Electronic Documents', en: 'ETA Electronic Documents', defaultNameAr: 'الوثائق الإلكترونية (ETA) - القالب الافتراضي', defaultNameEn: 'ETA Electronic Documents - System Default' }
 ];
 
 const DEFAULT_LAYOUT: TemplateLayout = {
@@ -333,6 +386,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [sizeFilter, setSizeFilter] = useState('all');
+  const [templateTypeTab, setTemplateTypeTab] = useState<'default' | 'copies'>('default');
+  const [menuFilter, setMenuFilter] = useState<string>('all');
 
   // Canvas selection & zoom
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
@@ -1180,56 +1235,78 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
   };
 
   const ensureSystemDefaultTemplates = async (existingTemplates: Template[], companyId: string) => {
-    const requiredTypes = [
-      { type: 'invoices', nameAr: 'فاتورة مبيعات - القالب الافتراضي', nameEn: 'Sales Invoice - System Default' },
-      { type: 'purchase_invoices', nameAr: 'فاتورة مشتريات - القالب الافتراضي', nameEn: 'Purchase Invoice - System Default' },
-      { type: 'returns', nameAr: 'مرتجع مبيعات - القالب الافتراضي', nameEn: 'Sales Return - System Default' },
-      { type: 'purchase_returns', nameAr: 'مرتجع مشتريات - القالب الافتراضي', nameEn: 'Purchase Return - System Default' }
-    ];
+    const updatedList = [...existingTemplates];
+    const missingDocs = DOCUMENT_TYPES.filter(doc => {
+      return !updatedList.some(t => t.document_type === doc.id && isProtectedSystemTemplate(t));
+    });
 
-    let updatedList = [...existingTemplates];
-    for (const req of requiredTypes) {
-      const hasDefault = updatedList.some(t => t.document_type === req.type && (t.is_default || t.is_system));
-      if (!hasDefault) {
-        const payload = {
-          name: language === 'ar' ? req.nameAr : req.nameEn,
-          description: language === 'ar' ? 'القالب الافتراضي المحمي الخاص بالنظام' : 'Protected System Default Template',
-          paper_size_id: 'a4',
-          orientation: 'portrait' as const,
-          margin_top: 10,
-          margin_bottom: 10,
-          margin_left: 10,
-          margin_right: 10,
-          is_active: true,
-          layout: DEFAULT_LAYOUT,
-          company_id: companyId,
-          document_type: req.type,
-          is_default: true,
-          is_system: true,
-          print_profile_id: null
-        };
-        try {
-          const newId = await dbService.create('templates', payload);
-          updatedList.push({ ...payload, id: String(newId) });
-        } catch (err) {
-          console.error(`Failed to create system default template for ${req.type}`, err);
-        }
-      }
+    if (missingDocs.length > 0) {
+      const createdTemplates = await Promise.all(
+        missingDocs.map(async (doc) => {
+          const payload = {
+            name: language === 'ar' ? doc.defaultNameAr : doc.defaultNameEn,
+            description: language === 'ar' ? `القالب الافتراضي المحمي الخاص بالنظام (${doc.menuAr})` : `Protected System Default Template (${doc.menuEn})`,
+            paper_size_id: 'a4',
+            orientation: 'portrait' as const,
+            margin_top: 10,
+            margin_bottom: 10,
+            margin_left: 10,
+            margin_right: 10,
+            is_active: true,
+            layout: DEFAULT_LAYOUT,
+            company_id: companyId,
+            document_type: doc.id,
+            is_default: !updatedList.some(t => t.document_type === doc.id && t.is_default),
+            is_system: true,
+            print_profile_id: null
+          };
+          try {
+            const res: any = await dbService.create('templates', payload);
+            const newId = typeof res === 'string' ? res : String(res?.id || res?.template_id || res?.data?.id || `default-${doc.id}`);
+            return { ...payload, id: newId } as Template;
+          } catch (err) {
+            console.error(`Failed to create system default template for ${doc.id}`, err);
+            return { ...payload, id: `default-${doc.id}` } as Template;
+          }
+        })
+      );
+      updatedList.push(...createdTemplates);
     }
+
     return updatedList;
+  };
+
+  const getTemplateMenuId = (template: Template): string => {
+    const matchedDoc = DOCUMENT_TYPES.find(d => d.id === template.document_type);
+    if (matchedDoc) return matchedDoc.menuId;
+    const name = (template.name || '').toLowerCase();
+    if (name.includes('مشتريات') || name.includes('شراء') || name.includes('مورد') || name.includes('purchase') || name.includes('supplier')) return 'purchases';
+    if (name.includes('مخزن') || name.includes('مخزون') || name.includes('جرد') || name.includes('أصناف') || name.includes('stock') || name.includes('warehouse')) return 'warehouses';
+    if (name.includes('قبض') || name.includes('صرف') || name.includes('نقد') || name.includes('خزين') || name.includes('receipt') || name.includes('payment')) return 'cash';
+    if (name.includes('شيك') || name.includes('cheque')) return 'cheques';
+    if (name.includes('قيد') || name.includes('يومية') || name.includes('journal')) return 'general_ledger';
+    if (name.includes('أصل') || name.includes('إهلاك') || name.includes('asset') || name.includes('depreciation')) return 'fixed_assets';
+    if (name.includes('مرنة') || name.includes('مخصصة') || name.includes('flexible')) return 'flexible_operations';
+    if (name.includes('إلكترونية') || name.includes('eta')) return 'eta';
+    return 'sales';
   };
 
   const isProtectedSystemTemplate = (template?: Template | null) => {
     if (!template) return false;
+    const nameLower = (template.name || '').toLowerCase();
+    const hasCopyWord = nameLower.includes('نسخة') || nameLower.includes('copy') || nameLower.includes('مخصص');
+    if (hasCopyWord) return false;
+
     if (template.is_system || template.id === 'default' || template.id.startsWith('default-')) {
       return true;
     }
-    const nameLower = template.name.toLowerCase();
     const hasDefaultWord = nameLower.includes('الافتراضي') || nameLower.includes('default');
-    const hasCopyWord = nameLower.includes('نسخة') || nameLower.includes('copy');
+    if (hasDefaultWord) return true;
 
-    if (template.is_default && !hasCopyWord) return true;
-    if (hasDefaultWord && !hasCopyWord) return true;
+    const descLower = (template.description || '').toLowerCase();
+    if (descLower.includes('القالب الافتراضي المحمي') || descLower.includes('protected system default')) {
+      return true;
+    }
 
     return false;
   };
@@ -1246,10 +1323,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
         user?.company_id ? dbService.get<any>('companies', user.company_id) : Promise.resolve(null)
       ]);
 
-      let loadedTemplates = allTemplates;
-      if (user?.company_id) {
-        loadedTemplates = await ensureSystemDefaultTemplates(allTemplates, user.company_id);
-      }
+      const loadedTemplates = await ensureSystemDefaultTemplates(allTemplates, user?.company_id || '');
 
       setTemplates(loadedTemplates);
       setPaperSizes(allSizes);
@@ -2297,10 +2371,13 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
     const selectedSize = paperSizes.find(p => p.id === template.paper_size_id);
     const isCustomPreset = PAPER_SIZES_PRESETS.some(p => p.id === template.paper_size_id);
     const isCustom = selectedSize && !selectedSize.is_system && !isCustomPreset;
+    const cleanDescription = (template.description || '').includes('القالب الافتراضي المحمي') || (template.description || '').includes('Protected System Default')
+      ? (language === 'ar' ? `نسخة مخصصة من ${template.name}` : `Custom copy of ${template.name}`)
+      : (template.description || '');
 
     setFormData({
       name: `${template.name} - ${language === 'ar' ? 'نسخة' : 'Copy'}`,
-      description: template.description || '',
+      description: cleanDescription,
       paper_size_id: isCustom ? 'custom' : template.paper_size_id,
       orientation: template.orientation,
       margin_top: Number(template.margin_top),
@@ -2579,10 +2656,14 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
         if (isSystemProtected && (editingTemplate && (newName === editingTemplate.name || !newName.includes('نسخة')))) {
           newName = `${formData.name} - ${language === 'ar' ? 'نسخة مخصصة' : 'Custom Copy'}`;
         }
+        const cleanDesc = (formData.description || '').includes('القالب الافتراضي المحمي') || (formData.description || '').includes('Protected System Default')
+          ? (language === 'ar' ? `نسخة مخصصة من ${editingTemplate?.name || formData.name}` : `Custom copy of ${editingTemplate?.name || formData.name}`)
+          : formData.description;
 
         const copyPayload = {
           ...templatePayload,
           name: newName,
+          description: cleanDesc,
           is_default: isSystemProtected ? false : formData.is_default,
           is_system: false
         };
@@ -2632,6 +2713,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
         await changeDocumentType(pendingDocTypeChange);
         setPendingDocTypeChange(null);
       } else {
+        setTemplateTypeTab('copies');
         setView('list');
         setEditingTemplate(null);
         setSelectedElementId(null);
@@ -2649,15 +2731,22 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
   const activeElement = getSelectedElement();
 
-  const filteredTemplates = templates.filter(t => {
+  const baseFilteredTemplates = templates.filter(t => {
+    const docLabel = DOCUMENT_TYPES.find(d => d.id === t.document_type)?.ar || '';
     const matchesSearch = t.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          (t.description || '').toLowerCase().includes(searchTerm.toLowerCase());
+                          (t.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          docLabel.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || 
                           (statusFilter === 'active' && t.is_active) || 
                           (statusFilter === 'inactive' && !t.is_active);
     const matchesSize = sizeFilter === 'all' || t.paper_size_id === sizeFilter;
-    return matchesSearch && matchesStatus && matchesSize;
+    const matchesMenu = menuFilter === 'all' || getTemplateMenuId(t) === menuFilter;
+    return matchesSearch && matchesStatus && matchesSize && matchesMenu;
   });
+
+  const defaultTemplatesList = baseFilteredTemplates.filter(t => isProtectedSystemTemplate(t));
+  const copiedTemplatesList = baseFilteredTemplates.filter(t => !isProtectedSystemTemplate(t));
+  const filteredTemplates = templateTypeTab === 'default' ? defaultTemplatesList : copiedTemplatesList;
 
   // Mock document data for Real Live Preview
   const previewDocData = {
@@ -2799,7 +2888,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
   return (
     <div className={`h-full flex flex-col overflow-hidden text-zinc-800 transition-all ${
-      view === 'list' ? 'p-6 max-w-[1600px] mx-auto' : 'p-3 w-full max-w-none'
+      view === 'list' ? 'p-3 max-w-[1600px] mx-auto' : 'p-3 w-full max-w-none'
     }`} dir={dir}>
       <AnimatePresence mode="wait">
         {view === 'list' ? (
@@ -2808,62 +2897,62 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -15 }}
-            className="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden h-full"
+            className="flex-1 flex flex-col lg:flex-row gap-3 overflow-hidden h-full"
           >
             {/* Left Sidebar Navigation */}
-            <div className={`w-full lg:w-64 bg-zinc-50/50 border border-zinc-200/60 rounded-3xl p-5 flex flex-col space-y-6 overflow-y-auto shrink-0 ${dir === 'rtl' ? 'lg:border-l lg:border-r-0' : 'lg:border-r lg:border-l-0'}`}>
+            <div className={`w-full lg:w-56 bg-zinc-50/50 border border-zinc-200/60 rounded-2xl p-3.5 flex flex-col space-y-4 overflow-y-auto shrink-0 ${dir === 'rtl' ? 'lg:border-l lg:border-r-0' : 'lg:border-r lg:border-l-0'}`}>
               <div>
-                <div className="flex items-center gap-2 mb-6 px-2">
-                  <Settings className="text-emerald-600 animate-spin-slow" size={22} />
-                  <span className="font-extrabold text-sm text-zinc-900">{language === 'ar' ? 'أدوات التصميم' : 'Design Tools'}</span>
+                <div className="flex items-center gap-2 mb-4 px-2">
+                  <Settings className="text-emerald-600 animate-spin-slow" size={18} />
+                  <span className="font-extrabold text-xs text-zinc-900">{language === 'ar' ? 'أدوات التصميم' : 'Design Tools'}</span>
                 </div>
                 
                 {/* Print Templates Group */}
-                <div className="space-y-1 mb-6">
-                  <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider px-2 mb-2">
+                <div className="space-y-0.5 mb-4">
+                  <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider px-2 mb-1.5">
                     {language === 'ar' ? 'قوالب مستندات الطباعة' : 'Document Print Templates'}
                   </div>
                   <button
                     type="button"
                     onClick={() => setSubTab('templates')}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold rounded-xl transition-all ${
+                    className={`w-full flex items-center gap-2 px-2.5 py-2 text-xs font-bold rounded-xl transition-all ${
                       subTab === 'templates'
                         ? 'bg-emerald-50 text-emerald-700 shadow-sm'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
                     }`}
                   >
-                    <FileText size={16} />
+                    <FileText size={15} />
                     <span>{language === 'ar' ? 'قوالب الطباعة المصممة' : 'Print Templates'}</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setSubTab('profiles')}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold rounded-xl transition-all ${
+                    className={`w-full flex items-center gap-2 px-2.5 py-2 text-xs font-bold rounded-xl transition-all ${
                       subTab === 'profiles'
                         ? 'bg-emerald-50 text-emerald-700 shadow-sm'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
                     }`}
                   >
-                    <Sliders size={16} />
+                    <Sliders size={15} />
                     <span>{language === 'ar' ? 'ملفات تعريف الطباعة' : 'Print Profiles'}</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setSubTab('assignments')}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold rounded-xl transition-all ${
+                    className={`w-full flex items-center gap-2 px-2.5 py-2 text-xs font-bold rounded-xl transition-all ${
                       subTab === 'assignments'
                         ? 'bg-emerald-50 text-emerald-700 shadow-sm'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
                     }`}
                   >
-                    <Layers size={16} />
+                    <Layers size={15} />
                     <span>{language === 'ar' ? 'إعدادات قوالب العمليات' : 'Operation Assignments'}</span>
                   </button>
                 </div>
 
                 {/* Dashboard Layouts Group */}
-                <div className="space-y-1">
-                  <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider px-2 mb-2">
+                <div className="space-y-0.5">
+                  <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider px-2 mb-1.5">
                     {language === 'ar' ? 'تصميم لوحة التحكم' : 'Dashboard Layouts'}
                   </div>
                   <button
@@ -2872,13 +2961,13 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                       fetchDashboardTemplates();
                       setSubTab('dashboard_templates');
                     }}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold rounded-xl transition-all ${
+                    className={`w-full flex items-center gap-2 px-2.5 py-2 text-xs font-bold rounded-xl transition-all ${
                       subTab === 'dashboard_templates'
                         ? 'bg-emerald-50 text-emerald-700 shadow-sm'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
                     }`}
                   >
-                    <LayoutDashboard size={16} />
+                    <LayoutDashboard size={15} />
                     <span>{language === 'ar' ? 'قوالب لوحة التحكم' : 'Dashboard Templates'}</span>
                   </button>
                   <button
@@ -2887,49 +2976,49 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                       setDesignerMountKey(prev => prev + 1);
                       setSubTab('dashboard_designer');
                     }}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold rounded-xl transition-all ${
+                    className={`w-full flex items-center gap-2 px-2.5 py-2 text-xs font-bold rounded-xl transition-all ${
                       subTab === 'dashboard_designer'
                         ? 'bg-emerald-50 text-emerald-700 shadow-sm'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
                     }`}
                   >
-                    <Paintbrush size={16} />
+                    <Paintbrush size={15} />
                     <span>{language === 'ar' ? 'مصمم لوحة التحكم' : 'Dashboard Designer'}</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setSubTab('widget_library')}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold rounded-xl transition-all ${
+                    className={`w-full flex items-center gap-2 px-2.5 py-2 text-xs font-bold rounded-xl transition-all ${
                       subTab === 'widget_library'
                         ? 'bg-emerald-50 text-emerald-700 shadow-sm'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
                     }`}
                   >
-                    <BookOpen size={16} />
+                    <BookOpen size={15} />
                     <span>{language === 'ar' ? 'مكتبة الودجات' : 'Widget Library'}</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setSubTab('import_template')}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold rounded-xl transition-all ${
+                    className={`w-full flex items-center gap-2 px-2.5 py-2 text-xs font-bold rounded-xl transition-all ${
                       subTab === 'import_template'
                         ? 'bg-emerald-50 text-emerald-700 shadow-sm'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
                     }`}
                   >
-                    <Upload size={16} />
+                    <Upload size={15} />
                     <span>{language === 'ar' ? 'استيراد قالب' : 'Import Template'}</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setSubTab('export_template')}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold rounded-xl transition-all ${
+                    className={`w-full flex items-center gap-2 px-2.5 py-2 text-xs font-bold rounded-xl transition-all ${
                       subTab === 'export_template'
                         ? 'bg-emerald-50 text-emerald-700 shadow-sm'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
                     }`}
                   >
-                    <Download size={16} />
+                    <Download size={15} />
                     <span>{language === 'ar' ? 'تصدير القوالب' : 'Export Template'}</span>
                   </button>
                   <button
@@ -2938,13 +3027,13 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                       fetchDashboardTemplates();
                       setSubTab('default_templates');
                     }}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold rounded-xl transition-all ${
+                    className={`w-full flex items-center gap-2 px-2.5 py-2 text-xs font-bold rounded-xl transition-all ${
                       subTab === 'default_templates'
                         ? 'bg-emerald-50 text-emerald-700 shadow-sm'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
                     }`}
                   >
-                    <Sparkles size={16} />
+                    <Sparkles size={15} />
                     <span>{language === 'ar' ? 'القوالب الافتراضية' : 'Default Templates'}</span>
                   </button>
                   <button
@@ -2953,13 +3042,13 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                       fetchDashboardTemplates();
                       setSubTab('my_templates');
                     }}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold rounded-xl transition-all ${
+                    className={`w-full flex items-center gap-2 px-2.5 py-2 text-xs font-bold rounded-xl transition-all ${
                       subTab === 'my_templates'
                         ? 'bg-emerald-50 text-emerald-700 shadow-sm'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
                     }`}
                   >
-                    <FileText size={16} />
+                    <FileText size={15} />
                     <span>{language === 'ar' ? 'قوالبي الخاصة' : 'My Templates'}</span>
                   </button>
                 </div>
@@ -2967,25 +3056,25 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
             </div>
             
             {/* Right Content Panel */}
-            <div className="flex-1 bg-white border border-zinc-200/60 rounded-3xl p-6 shadow-sm overflow-y-auto h-full flex flex-col min-w-0">
+            <div className="flex-1 bg-white border border-zinc-200/60 rounded-2xl p-4 shadow-sm overflow-y-auto h-full flex flex-col min-w-0">
               
               {/* Header inside Right Content Area based on current active tab */}
               {['templates', 'profiles', 'assignments'].includes(subTab) ? (
-                <div className={`flex flex-col md:flex-row items-center justify-between gap-4 border-b border-zinc-100 pb-5 mb-5 shrink-0 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                <div className={`flex flex-col md:flex-row items-center justify-between gap-2 border-b border-zinc-100 pb-2.5 mb-2.5 shrink-0 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                   <div>
-                    <h1 className="text-2xl font-black tracking-tight text-zinc-900 flex items-center gap-2">
-                      <Settings className="text-emerald-600 animate-spin-slow" size={26} />
+                    <h1 className="text-base font-extrabold tracking-tight text-zinc-900 flex items-center gap-1.5">
+                      <Settings className="text-emerald-600 animate-spin-slow" size={18} />
                       <span>{language === 'ar' ? 'إدارة وقوالب الطباعة' : 'Visual Print Layout Manager'}</span>
                     </h1>
-                    <p className="text-zinc-500 text-sm mt-1">
+                    <p className="text-zinc-500 text-[11px] mt-0.5">
                       {language === 'ar' 
-                        ? 'إدارة قوالب الطباعة، ملفات تعريف الطباعة (Print Profiles)، وربطها بالعمليات المختلفة.' 
+                        ? 'إدارة قوالب الطباعة لجميع الحركات المالية والمخزنية والتشغيلية، وملفات تعريف الطباعة.' 
                         : 'Manage visual document templates, print profiles, and direct operations routing.'}
                     </p>
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+                  <div className="flex items-center gap-2 w-full md:w-auto justify-end">
                     {subTab === 'templates' && (
                       <button
                         type="button"
@@ -3017,9 +3106,9 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                           setPreviewMode(false);
                           setView('create');
                         }}
-                        className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl hover:bg-emerald-700 transition-all font-bold text-sm shadow-lg shadow-emerald-600/10 hover:shadow-emerald-600/25 whitespace-nowrap"
+                        className="flex items-center gap-1.5 bg-emerald-600 text-white px-3.5 py-1.5 rounded-xl hover:bg-emerald-700 transition-all font-bold text-xs shadow-sm whitespace-nowrap cursor-pointer"
                       >
-                        <Plus size={18} />
+                        <Plus size={14} />
                         <span>{language === 'ar' ? 'إنشاء قالب جديد' : 'Create New Template'}</span>
                       </button>
                     )}
@@ -3043,19 +3132,19 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                           });
                           setIsProfileModalOpen(true);
                         }}
-                        className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl hover:bg-emerald-700 transition-all font-bold text-sm shadow-lg shadow-emerald-600/10 hover:shadow-emerald-600/25 whitespace-nowrap"
+                        className="flex items-center gap-1.5 bg-emerald-600 text-white px-3.5 py-1.5 rounded-xl hover:bg-emerald-700 transition-all font-bold text-xs shadow-sm whitespace-nowrap cursor-pointer"
                       >
-                        <Plus size={18} />
+                        <Plus size={14} />
                         <span>{language === 'ar' ? 'إنشاء ملف تعريف جديد' : 'Create Print Profile'}</span>
                       </button>
                     )}
                   </div>
                 </div>
               ) : (
-                <div className={`flex flex-col md:flex-row items-center justify-between gap-4 border-b border-zinc-100 pb-5 mb-5 shrink-0 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                <div className={`flex flex-col md:flex-row items-center justify-between gap-2 border-b border-zinc-100 pb-2.5 mb-2.5 shrink-0 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                   <div>
-                    <h1 className="text-2xl font-black tracking-tight text-zinc-900 flex items-center gap-2">
-                      <LayoutDashboard className="text-emerald-600" size={26} />
+                    <h1 className="text-base font-extrabold tracking-tight text-zinc-900 flex items-center gap-1.5">
+                      <LayoutDashboard className="text-emerald-600" size={18} />
                       <span>
                         {subTab === 'dashboard_templates' && (language === 'ar' ? 'قوالب لوحة التحكم' : 'Dashboard Layout Templates')}
                         {subTab === 'dashboard_designer' && (language === 'ar' ? 'مصمم لوحة التحكم' : 'Dashboard Workspace Designer')}
@@ -3066,7 +3155,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                         {subTab === 'my_templates' && (language === 'ar' ? 'قوالبي الخاصة للوحة التحكم' : 'My Dashboard Templates')}
                       </span>
                     </h1>
-                    <p className="text-zinc-500 text-sm mt-1">
+                    <p className="text-zinc-500 text-[11px] mt-0.5">
                       {subTab === 'dashboard_templates' && (language === 'ar' ? 'إدارة قوالب وتصميمات لوحة التحكم، استنساخها، وتفعيلها للمستخدمين.' : 'Manage, duplicate, activate, and customize interactive dashboard layouts.')}
                       {subTab === 'dashboard_designer' && (language === 'ar' ? 'قم بتخصيص لوحة التحكم والوصول السريع والودجات والرسوم البيانية وحفظها كقالب.' : 'Customize widgets, drag & drop cards, resize panels, and save visual layout presets.')}
                       {subTab === 'widget_library' && (language === 'ar' ? 'دليل وودجات لوحة التحكم المتاحة: المؤشرات، الرسوم البيانية، الجداول، والاختصارات.' : 'Showcase and guidelines for KPIs, Charts, Data Tables, and Shortcut lists.')}
@@ -3084,9 +3173,9 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                         setDesignerMountKey(prev => prev + 1);
                         setSubTab('dashboard_designer');
                       }}
-                      className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl hover:bg-emerald-700 transition-all font-bold text-sm shadow-lg shadow-emerald-600/10 hover:shadow-emerald-600/25 whitespace-nowrap"
+                      className="flex items-center gap-1.5 bg-emerald-600 text-white px-3.5 py-1.5 rounded-xl hover:bg-emerald-700 transition-all font-bold text-xs shadow-sm whitespace-nowrap cursor-pointer"
                     >
-                      <Plus size={18} />
+                      <Plus size={14} />
                       <span>{language === 'ar' ? 'تصميم جديد' : 'New Design Workspace'}</span>
                     </button>
                   )}
@@ -3095,28 +3184,80 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
               {/* Views */}
               {subTab === 'templates' && (
-                <div className="flex-1 flex flex-col space-y-6 overflow-hidden">
-                  {/* Filters */}
-                  <div className="bg-white border border-zinc-200/80 p-4 rounded-2xl shadow-sm flex flex-col md:flex-row items-center gap-4 shrink-0">
-                    <div className="relative flex-1 w-full">
-                      <Search className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
-                      <input
-                        type="text"
-                        placeholder={language === 'ar' ? 'بحث باسم القالب أو الوصف...' : 'Search template name or description...'}
-                        className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2.5 bg-zinc-50/50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm`}
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
+                <div className="flex-1 flex flex-col space-y-2.5 overflow-hidden">
+                  {/* 2 Tabs (Default vs Copies) + Compact Filters Bar */}
+                  <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2 bg-zinc-50/70 border border-zinc-200/80 p-2 rounded-xl shrink-0">
+                    {/* 2 Tabs: Default Templates vs Copied/Custom Templates */}
+                    <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-zinc-200/80 shadow-2xs shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setTemplateTypeTab('default')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
+                          templateTypeTab === 'default'
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
+                        }`}
+                      >
+                        <Sparkles size={13} />
+                        <span>{language === 'ar' ? 'القوالب الافتراضية' : 'Default Templates'}</span>
+                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                          templateTypeTab === 'default'
+                            ? 'bg-white/20 text-white'
+                            : 'bg-zinc-100 text-zinc-600'
+                        }`}>
+                          {defaultTemplatesList.length}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setTemplateTypeTab('copies')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
+                          templateTypeTab === 'copies'
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
+                        }`}
+                      >
+                        <Copy size={13} />
+                        <span>{language === 'ar' ? 'نسخ القوالب (المخصصة)' : 'Copied / Custom Templates'}</span>
+                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                          templateTypeTab === 'copies'
+                            ? 'bg-white/20 text-white'
+                            : 'bg-zinc-100 text-zinc-600'
+                        }`}>
+                          {copiedTemplatesList.length}
+                        </span>
+                      </button>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                      <div className="flex items-center gap-2">
-                        <SlidersHorizontal size={16} className="text-zinc-500" />
-                        <span className="text-xs font-bold text-zinc-500">{language === 'ar' ? 'تصفية:' : 'Filters:'}</span>
+                    {/* Search & Filters */}
+                    <div className="flex flex-wrap items-center gap-2 flex-1 justify-end">
+                      <div className="relative flex-1 min-w-[180px] max-w-xs">
+                        <Search className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-zinc-400`} size={14} />
+                        <input
+                          type="text"
+                          placeholder={language === 'ar' ? 'بحث باسم القالب أو الحركة...' : 'Search template or operation...'}
+                          className={`w-full ${dir === 'rtl' ? 'pr-8 pl-3' : 'pl-8 pr-3'} py-1.5 bg-white border border-zinc-200 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-xs`}
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                        />
                       </div>
-                      
+
                       <select
-                        className="bg-zinc-50 border border-zinc-200 px-3 py-2 rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                        className="bg-white border border-zinc-200 px-2.5 py-1.5 rounded-lg text-xs font-bold text-zinc-700 outline-none focus:border-emerald-500"
+                        value={menuFilter}
+                        onChange={(e) => setMenuFilter(e.target.value)}
+                      >
+                        <option value="all">{language === 'ar' ? 'جميع القوائم' : 'All Menus'}</option>
+                        {TEMPLATE_MENU_GROUPS.map(menu => (
+                          <option key={menu.id} value={menu.id}>
+                            {language === 'ar' ? menu.ar : menu.en}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        className="bg-white border border-zinc-200 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-700 outline-none focus:border-emerald-500"
                         value={statusFilter}
                         onChange={(e: any) => setStatusFilter(e.target.value)}
                       >
@@ -3126,7 +3267,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                       </select>
 
                       <select
-                        className="bg-zinc-50 border border-zinc-200 px-3 py-2 rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                        className="bg-white border border-zinc-200 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-700 outline-none focus:border-emerald-500"
                         value={sizeFilter}
                         onChange={(e: any) => setSizeFilter(e.target.value)}
                       >
@@ -3141,135 +3282,176 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                     </div>
                   </div>
 
-                  {/* List */}
+                  {/* List Grouped by Menu */}
                   {loading ? (
-                    <div className="flex flex-col items-center justify-center py-24 space-y-4 flex-1">
-                      <div className="w-9 h-9 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-                      <span className="text-zinc-500 text-sm font-semibold">{language === 'ar' ? 'جاري التحميل...' : 'Loading templates...'}</span>
+                    <div className="flex flex-col items-center justify-center py-16 space-y-3 flex-1">
+                      <div className="w-7 h-7 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-zinc-500 text-xs font-semibold">{language === 'ar' ? 'جاري التحميل...' : 'Loading templates...'}</span>
                     </div>
                   ) : filteredTemplates.length === 0 ? (
-                    <div className="bg-white border border-dashed border-zinc-200/80 rounded-2xl p-12 text-center flex flex-col items-center justify-center space-y-3 flex-1">
-                      <FileText size={48} className="text-zinc-300" />
-                      <h3 className="text-base font-bold text-zinc-700">{language === 'ar' ? 'لا يوجد قوالب' : 'No Templates Found'}</h3>
-                      <p className="text-zinc-500 text-xs max-w-sm">
-                        {language === 'ar' 
-                          ? 'لم يتم العثور على أي قوالب مطابقة لمعايير البحث الحالية.' 
-                          : 'No print layouts matched your current search filters.'}
+                    <div className="bg-white border border-dashed border-zinc-200/80 rounded-xl p-8 text-center flex flex-col items-center justify-center space-y-2 flex-1">
+                      <FileText size={36} className="text-zinc-300" />
+                      <h3 className="text-sm font-bold text-zinc-700">
+                        {templateTypeTab === 'copies'
+                          ? (language === 'ar' ? 'لا توجد نسخ أو قوالب مخصصة حالياً' : 'No Copied or Custom Templates Yet')
+                          : (language === 'ar' ? 'لا يوجد قوالب مطابقة' : 'No Templates Found')}
+                      </h3>
+                      <p className="text-zinc-500 text-[11px] max-w-md">
+                        {templateTypeTab === 'copies'
+                          ? (language === 'ar'
+                              ? 'يمكنك نسخ أي قالب من تبويب "القوالب الافتراضية" بالضغط على زر النسخ أو تعديله وحفظه ليظهر هنا.'
+                              : 'You can copy any template from the Default Templates tab or create a new custom template.')
+                          : (language === 'ar'
+                              ? 'لم يتم العثور على أي قوالب مطابقة لمعايير البحث الحالية.'
+                              : 'No print layouts matched your current search filters.')}
                       </p>
                     </div>
                   ) : (
-                    <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm flex-1 overflow-y-auto">
-                      <table className="w-full text-sm border-collapse text-left" dir={dir}>
-                        <thead>
-                          <tr className="bg-zinc-50/80 border-b border-zinc-200 text-zinc-700 font-bold">
-                            <th className={`px-6 py-4 text-xs font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                              {language === 'ar' ? 'اسم القالب' : 'Template Name'}
+                    <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-2xs flex-1 overflow-y-auto">
+                      <table className="w-full text-xs border-collapse text-left" dir={dir}>
+                        <thead className="sticky top-0 z-10 bg-zinc-100/95 backdrop-blur-xs border-b border-zinc-200 text-zinc-700">
+                          <tr>
+                            <th className={`px-3 py-1.5 text-[11px] font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {language === 'ar' ? 'اسم القالب / الحركة' : 'Template / Operation'}
                             </th>
-                            <th className={`px-6 py-4 text-xs font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <th className={`px-3 py-1.5 text-[11px] font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {language === 'ar' ? 'القائمة' : 'Menu'}
+                            </th>
+                            <th className={`px-3 py-1.5 text-[11px] font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {language === 'ar' ? 'حجم الورق' : 'Paper Size'}
                             </th>
-                            <th className={`px-6 py-4 text-xs font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <th className={`px-3 py-1.5 text-[11px] font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {language === 'ar' ? 'الاتجاه' : 'Orientation'}
                             </th>
-                            <th className={`px-6 py-4 text-xs font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <th className={`px-3 py-1.5 text-[11px] font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {language === 'ar' ? 'الهوامش (مم)' : 'Margins (mm)'}
                             </th>
-                            <th className="px-6 py-4 text-xs font-extrabold text-center">
-                              {language === 'ar' ? 'حالة القالب' : 'Status'}
+                            <th className="px-3 py-1.5 text-[11px] font-extrabold text-center">
+                              {language === 'ar' ? 'الحالة' : 'Status'}
                             </th>
-                            <th className="px-6 py-4 text-xs font-extrabold text-center">
+                            <th className="px-3 py-1.5 text-[11px] font-extrabold text-center">
                               {language === 'ar' ? 'إجراءات' : 'Actions'}
                             </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-100 text-zinc-700">
-                          {filteredTemplates.map((template) => {
-                            const sizeObj = paperSizes.find(p => p.id === template.paper_size_id);
-                            const presetObj = PAPER_SIZES_PRESETS.find(p => p.id === template.paper_size_id);
-                            const sizeName = presetObj?.name || sizeObj?.name || template.paper_size_id;
-                            const sizeWidth = presetObj?.width || sizeObj?.width || '—';
-                            const sizeHeight = presetObj?.height || sizeObj?.height || '—';
+                          {TEMPLATE_MENU_GROUPS.map((menuGroup) => {
+                            const groupTemplates = filteredTemplates.filter(t => getTemplateMenuId(t) === menuGroup.id);
+                            if (groupTemplates.length === 0) return null;
 
                             return (
-                              <tr key={template.id} className="hover:bg-zinc-50/50 transition-colors">
-                                <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                  <div className="flex items-center gap-2">
-                                    <div className="font-bold text-zinc-950">{template.name}</div>
-                                    {template.is_default && (
-                                      <span className="text-[9px] bg-amber-50 text-amber-700 font-extrabold px-1.5 py-0.5 rounded border border-amber-200/50">
-                                        {language === 'ar' ? 'الافتراضي' : 'Default'}
+                              <React.Fragment key={menuGroup.id}>
+                                {/* Menu Group Header Row */}
+                                <tr className="bg-emerald-50/70 border-y border-emerald-200/70">
+                                  <td colSpan={7} className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-1.5">
+                                        <Layers size={13} className="text-emerald-700" />
+                                        <span className="text-[11px] font-black text-emerald-900">
+                                          {language === 'ar' ? menuGroup.ar : menuGroup.en}
+                                        </span>
+                                      </div>
+                                      <span className="text-[10px] font-extrabold bg-emerald-600/10 text-emerald-800 px-2 py-0.2 rounded-full border border-emerald-200/60">
+                                        {groupTemplates.length} {language === 'ar' ? 'قالب' : 'Templates'}
                                       </span>
-                                    )}
-                                  </div>
-                                  <div className="text-[10px] text-zinc-400 font-bold mt-0.5">
-                                    {DOCUMENT_TYPES.find(d => d.id === template.document_type)?.ar || template.document_type || ''}
-                                  </div>
-                                  {template.description && (
-                                    <div className="text-zinc-500 text-xs mt-1 line-clamp-1">{template.description}</div>
-                                  )}
-                                </td>
-                                <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="font-semibold text-zinc-800">{sizeName}</span>
-                                    <span className="text-[10px] text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded">
-                                      {sizeWidth} × {sizeHeight} mm
-                                    </span>
-                                  </div>
-                                </td>
-                                <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} uppercase font-medium text-zinc-700`}>
-                                  {template.orientation === 'portrait'
-                                    ? (language === 'ar' ? 'طولي (Portrait)' : 'Portrait')
-                                    : (language === 'ar' ? 'عرضي (Landscape)' : 'Landscape')}
-                                </td>
-                                <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} text-xs font-medium text-zinc-600`}>
-                                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 max-w-[160px]">
-                                    <span>{language === 'ar' ? 'أعلى:' : 'Top:'} {template.margin_top}</span>
-                                    <span>{language === 'ar' ? 'أسفل:' : 'Bottom:'} {template.margin_bottom}</span>
-                                    <span>{language === 'ar' ? 'يمين:' : 'Right:'} {template.margin_right}</span>
-                                    <span>{language === 'ar' ? 'يسار:' : 'Left:'} {template.margin_left}</span>
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4 text-center">
-                                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${
-                                    template.is_active
-                                      ? 'bg-emerald-50/80 text-emerald-700 border-emerald-200/50'
-                                      : 'bg-zinc-50 text-zinc-500 border-zinc-200/50'
-                                  }`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${template.is_active ? 'bg-emerald-600' : 'bg-zinc-400'}`}></span>
-                                    {template.is_active ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4">
-                                  <div className="flex items-center justify-center gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleEdit(template)}
-                                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                      title={language === 'ar' ? 'تعديل التصميم' : 'Edit Design'}
-                                    >
-                                      <Edit2 size={16} />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleCopy(template)}
-                                      className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                                      title={language === 'ar' ? 'نسخ القالب' : 'Copy Template'}
-                                    >
-                                      <Copy size={16} />
-                                    </button>
-                                    {!isProtectedSystemTemplate(template) && (
-                                       <button
-                                      type="button"
-                                      onClick={() => handleDelete(template.id)}
-                                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                      title={language === 'ar' ? 'حذف القالب' : 'Delete Template'}
-                                    >
-                                      <Trash2 size={16} />
-                                    </button>
-                                     )}
-                                  </div>
-                                </td>
-                              </tr>
+                                    </div>
+                                  </td>
+                                </tr>
+
+                                {/* Templates inside this Menu Group */}
+                                {groupTemplates.map((template) => {
+                                  const sizeObj = paperSizes.find(p => p.id === template.paper_size_id);
+                                  const presetObj = PAPER_SIZES_PRESETS.find(p => p.id === template.paper_size_id);
+                                  const sizeName = presetObj?.name || sizeObj?.name || template.paper_size_id;
+                                  const sizeWidth = presetObj?.width || sizeObj?.width || '—';
+                                  const sizeHeight = presetObj?.height || sizeObj?.height || '—';
+                                  const docInfo = DOCUMENT_TYPES.find(d => d.id === template.document_type);
+
+                                  return (
+                                    <tr key={template.id} className="hover:bg-zinc-50/70 transition-colors">
+                                      <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className="font-bold text-zinc-900 text-xs leading-tight">{template.name}</span>
+                                          {template.is_default && (
+                                            <span className="text-[9px] bg-amber-50 text-amber-700 font-extrabold px-1.5 py-0.2 rounded border border-amber-200/60 leading-none">
+                                              {language === 'ar' ? 'الافتراضي' : 'Default'}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="text-[10px] text-zinc-400 font-semibold leading-tight mt-0.5">
+                                          {docInfo?.ar || template.document_type || ''}
+                                        </div>
+                                      </td>
+                                      <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-zinc-100 text-zinc-700">
+                                          {language === 'ar' ? menuGroup.ar : menuGroup.en}
+                                        </span>
+                                      </td>
+                                      <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                        <div className="flex items-center gap-1 flex-wrap">
+                                          <span className="font-semibold text-zinc-800 text-[11px]">{sizeName.split(' (')[0]}</span>
+                                          <span className="text-[9px] text-zinc-500 bg-zinc-100 px-1 py-0.2 rounded">
+                                            {sizeWidth}×{sizeHeight}
+                                          </span>
+                                        </div>
+                                      </td>
+                                      <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} text-[11px] font-medium text-zinc-700`}>
+                                        {template.orientation === 'portrait'
+                                          ? (language === 'ar' ? 'طولي (Portrait)' : 'Portrait')
+                                          : (language === 'ar' ? 'عرضي (Landscape)' : 'Landscape')}
+                                      </td>
+                                      <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} text-[10px] font-medium text-zinc-600`}>
+                                        <div className="grid grid-cols-2 gap-x-2 gap-y-0 max-w-[135px] leading-tight">
+                                          <span>{language === 'ar' ? 'أعلى:' : 'T:'} {template.margin_top}</span>
+                                          <span>{language === 'ar' ? 'أسفل:' : 'B:'} {template.margin_bottom}</span>
+                                          <span>{language === 'ar' ? 'يمين:' : 'R:'} {template.margin_right}</span>
+                                          <span>{language === 'ar' ? 'يسار:' : 'L:'} {template.margin_left}</span>
+                                        </div>
+                                      </td>
+                                      <td className="px-3 py-1.5 text-center">
+                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                          template.is_active
+                                            ? 'bg-emerald-50/80 text-emerald-700 border-emerald-200/50'
+                                            : 'bg-zinc-50 text-zinc-500 border-zinc-200/50'
+                                        }`}>
+                                          <span className={`w-1.5 h-1.5 rounded-full ${template.is_active ? 'bg-emerald-600' : 'bg-zinc-400'}`}></span>
+                                          {template.is_active ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
+                                        </span>
+                                      </td>
+                                      <td className="px-3 py-1.5">
+                                        <div className="flex items-center justify-center gap-1">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleEdit(template)}
+                                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                            title={language === 'ar' ? 'تعديل التصميم' : 'Edit Design'}
+                                          >
+                                            <Edit2 size={14} />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleCopy(template)}
+                                            className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                                            title={language === 'ar' ? 'نسخ القالب' : 'Copy Template'}
+                                          >
+                                            <Copy size={14} />
+                                          </button>
+                                          {!isProtectedSystemTemplate(template) && (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleDelete(template.id)}
+                                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                              title={language === 'ar' ? 'حذف القالب' : 'Delete Template'}
+                                            >
+                                              <Trash2 size={14} />
+                                            </button>
+                                          )}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </React.Fragment>
                             );
                           })}
                         </tbody>
@@ -3280,26 +3462,26 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
               )}
 
               {subTab === 'profiles' && (
-                <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm flex-1 overflow-y-auto">
-                  <table className="w-full text-sm border-collapse text-left" dir={dir}>
+                <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-2xs flex-1 overflow-y-auto">
+                  <table className="w-full text-xs border-collapse text-left" dir={dir}>
                     <thead>
-                      <tr className="bg-zinc-50/80 border-b border-zinc-200 text-zinc-700 font-bold">
-                        <th className={`px-6 py-4 text-xs font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <tr className="bg-zinc-100/90 border-b border-zinc-200 text-zinc-700 font-bold">
+                        <th className={`px-3 py-1.5 text-[11px] font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                           {language === 'ar' ? 'اسم ملف التعريف' : 'Profile Name'}
                         </th>
-                        <th className={`px-6 py-4 text-xs font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        <th className={`px-3 py-1.5 text-[11px] font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                           {language === 'ar' ? 'حجم الورق' : 'Paper Size'}
                         </th>
-                        <th className={`px-6 py-4 text-xs font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        <th className={`px-3 py-1.5 text-[11px] font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                           {language === 'ar' ? 'الاتجاه' : 'Orientation'}
                         </th>
-                        <th className={`px-6 py-4 text-xs font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        <th className={`px-3 py-1.5 text-[11px] font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                           {language === 'ar' ? 'الهوامش (مم)' : 'Margins (mm)'}
                         </th>
-                        <th className={`px-6 py-4 text-xs font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        <th className={`px-3 py-1.5 text-[11px] font-extrabold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                           {language === 'ar' ? 'دقة الطباعة' : 'Resolution'}
                         </th>
-                        <th className="px-6 py-4 text-xs font-extrabold text-center">
+                        <th className="px-3 py-1.5 text-[11px] font-extrabold text-center">
                           {language === 'ar' ? 'إجراءات' : 'Actions'}
                         </th>
                       </tr>
@@ -3307,7 +3489,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                     <tbody className="divide-y divide-zinc-100 text-zinc-700">
                       {printProfiles.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="text-center py-12 text-zinc-400 font-bold">
+                          <td colSpan={6} className="text-center py-8 text-zinc-400 font-bold">
                             {language === 'ar' ? 'لا توجد ملفات تعريف طباعة مضافة بعد.' : 'No print profiles created yet.'}
                           </td>
                         </tr>
@@ -3321,35 +3503,35 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
                           return (
                             <tr key={profile.id} className="hover:bg-zinc-50/50 transition-colors">
-                              <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} font-bold text-zinc-950`}>
+                              <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} font-bold text-zinc-950`}>
                                 {profile.name}
                               </td>
-                              <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="font-semibold text-zinc-800 capitalize">{sizeName}</span>
-                                  <span className="text-[10px] text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded">
+                              <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                <div className="flex items-center gap-1">
+                                  <span className="font-semibold text-zinc-800 capitalize text-[11px]">{sizeName}</span>
+                                  <span className="text-[9px] text-zinc-400 bg-zinc-100 px-1 py-0.2 rounded">
                                     {sizeWidth} × {sizeHeight} mm
                                   </span>
                                 </div>
                               </td>
-                              <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} capitalize font-medium text-zinc-700`}>
+                              <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} capitalize font-medium text-zinc-700 text-[11px]`}>
                                 {profile.orientation === 'portrait'
                                   ? (language === 'ar' ? 'طولي (Portrait)' : 'Portrait')
                                   : (language === 'ar' ? 'عرضي (Landscape)' : 'Landscape')}
                               </td>
-                              <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} text-xs font-medium text-zinc-600`}>
-                                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 max-w-[160px]">
-                                  <span>{language === 'ar' ? 'أعلى:' : 'Top:'} {profile.margin_top}</span>
-                                  <span>{language === 'ar' ? 'أسفل:' : 'Bottom:'} {profile.margin_bottom}</span>
-                                  <span>{language === 'ar' ? 'يمين:' : 'Right:'} {profile.margin_right}</span>
-                                  <span>{language === 'ar' ? 'يسار:' : 'Left:'} {profile.margin_left}</span>
+                              <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} text-[10px] font-medium text-zinc-600`}>
+                                <div className="grid grid-cols-2 gap-x-2 gap-y-0 max-w-[135px] leading-tight">
+                                  <span>{language === 'ar' ? 'أعلى:' : 'T:'} {profile.margin_top}</span>
+                                  <span>{language === 'ar' ? 'أسفل:' : 'B:'} {profile.margin_bottom}</span>
+                                  <span>{language === 'ar' ? 'يمين:' : 'R:'} {profile.margin_right}</span>
+                                  <span>{language === 'ar' ? 'يسار:' : 'L:'} {profile.margin_left}</span>
                                 </div>
                               </td>
-                              <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} font-semibold text-zinc-800`}>
+                              <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} font-semibold text-zinc-800 text-[11px]`}>
                                 {profile.dpi} DPI
                               </td>
-                              <td className="px-6 py-4">
-                                <div className="flex items-center justify-center gap-2">
+                              <td className="px-3 py-1.5">
+                                <div className="flex items-center justify-center gap-1">
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -3369,26 +3551,26 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                                       });
                                       setIsProfileModalOpen(true);
                                     }}
-                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                                     title={language === 'ar' ? 'تعديل الملف' : 'Edit Profile'}
                                   >
-                                    <Edit2 size={16} />
+                                    <Edit2 size={14} />
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => handleCopyProfile(profile)}
-                                    className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                                    className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
                                     title={language === 'ar' ? 'نسخ الملف' : 'Copy Profile'}
                                   >
-                                    <Copy size={16} />
+                                    <Copy size={14} />
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteProfile(profile.id)}
-                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                    className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                                     title={language === 'ar' ? 'حذف الملف' : 'Delete Profile'}
                                   >
-                                    <Trash2 size={16} />
+                                    <Trash2 size={14} />
                                   </button>
                                 </div>
                               </td>
@@ -3402,104 +3584,124 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
               )}
 
               {subTab === 'assignments' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto flex-1 pb-10">
-                  {DOCUMENT_TYPES.map((docType) => {
-                    const matchedTemplates = templates.filter(t => t.document_type === docType.id);
-                    const defaultTemplate = matchedTemplates.find(t => t.is_default);
+                <div className="space-y-4 overflow-y-auto flex-1 pb-6">
+                  {TEMPLATE_MENU_GROUPS.map((menuGroup) => {
+                    const menuDocs = DOCUMENT_TYPES.filter(d => d.menuId === menuGroup.id);
+                    if (menuDocs.length === 0) return null;
 
                     return (
-                      <div
-                        key={docType.id}
-                        className="bg-white border border-zinc-200 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4 font-bold"
-                      >
-                        <div>
-                          <div className="flex items-center justify-between">
-                            <h3 className="font-black text-zinc-900 text-sm">
-                              {language === 'ar' ? docType.ar.split(' / ')[0] : docType.en}
-                            </h3>
-                            <span className="text-[10px] text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded-full font-bold">
-                              {matchedTemplates.length} {language === 'ar' ? 'قوالب' : 'Templates'}
+                      <div key={menuGroup.id} className="space-y-2">
+                        <div className="flex items-center justify-between bg-emerald-50/70 border border-emerald-200/70 px-3 py-1.5 rounded-xl">
+                          <div className="flex items-center gap-1.5">
+                            <Layers size={14} className="text-emerald-700" />
+                            <span className="text-xs font-black text-emerald-950">
+                              {language === 'ar' ? menuGroup.ar : menuGroup.en}
                             </span>
                           </div>
-                          <p className="text-[11px] text-zinc-400 font-semibold mt-1">
-                            {language === 'ar' ? `تخصيص القوالب والطباعة لـ ${docType.ar.split(' / ')[0]}` : `Assign and configure print routing for ${docType.en}`}
-                          </p>
+                          <span className="text-[10px] font-extrabold bg-emerald-600/10 text-emerald-800 px-2 py-0.5 rounded-full">
+                            {menuDocs.length} {language === 'ar' ? 'حركات' : 'Operations'}
+                          </span>
                         </div>
 
-                        <div className="space-y-2">
-                          <label className="text-[11px] text-zinc-500 font-bold block">
-                            {language === 'ar' ? 'القالب الافتراضي النشط:' : 'Active Default Template:'}
-                          </label>
-                          {matchedTemplates.length === 0 ? (
-                            <div className="p-3 bg-amber-50/50 border border-dashed border-amber-200 rounded-2xl text-center">
-                              <span className="text-[10px] text-amber-700 font-bold block">
-                                {language === 'ar' ? 'لا يوجد أي قوالب مصممة لهذه العملية' : 'No templates designed for this operation'}
-                              </span>
-                            </div>
-                          ) : (
-                            <select
-                              value={defaultTemplate?.id || ''}
-                              onChange={(e) => handleSetDefaultTemplate(e.target.value, docType.id)}
-                              className="w-full bg-zinc-50 border border-zinc-200 px-3 py-2.5 rounded-xl text-xs font-bold outline-none focus:border-emerald-500 focus:bg-white transition-all"
-                            >
-                              <option value="">{language === 'ar' ? 'اختر قالب افتراضي...' : 'Select default template...'}</option>
-                              {matchedTemplates.map(t => (
-                                <option key={t.id} value={t.id}>{t.name} ({t.paper_size_id.toUpperCase()})</option>
-                              ))}
-                            </select>
-                          )}
-                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {menuDocs.map((docType) => {
+                            const matchedTemplates = templates.filter(t => t.document_type === docType.id);
+                            const defaultTemplate = matchedTemplates.find(t => t.is_default);
 
-                        <div className="pt-3 border-t border-zinc-100 flex items-center justify-between gap-2">
-                          {matchedTemplates.length > 0 && (
-                            <div className="text-[10px] text-zinc-500 font-semibold">
-                              {defaultTemplate ? (
-                                <span className="text-emerald-600 flex items-center gap-1">
-                                  <Check size={12} />
-                                  <span>{language === 'ar' ? 'افتراضي: ' : 'Default: '}{defaultTemplate.name}</span>
-                                </span>
-                              ) : (
-                                <span className="text-amber-600 font-bold">
-                                  {language === 'ar' ? 'لم يتم تحديد قالب افتراضي' : 'No default selected'}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setFormData({
-                                name: '',
-                                description: '',
-                                paper_size_id: 'a4',
-                                orientation: 'portrait',
-                                margin_top: 10,
-                                margin_bottom: 10,
-                                margin_left: 10,
-                                margin_right: 10,
-                                is_active: true,
-                                customWidth: 210,
-                                customHeight: 297,
-                                customUnit: 'mm',
-                                document_type: docType.id,
-                                is_default: matchedTemplates.length === 0,
-                                print_profile_id: ''
-                              });
-                              const targetLayout = JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
-                              setDesignerLayout(targetLayout);
-                              setHistory([JSON.parse(JSON.stringify(targetLayout))]);
-                              setHistoryIndex(0);
-                              setEditingTemplate(null);
-                              setSelectedElementId(null);
-                              setSelectedSection(null);
-                              setPreviewMode(false);
-                              setView('create');
-                            }}
-                            className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-[10px] font-black transition-all ml-auto"
-                          >
-                            <Plus size={12} />
-                            <span>{language === 'ar' ? 'إضافة قالب' : 'Add Template'}</span>
-                          </button>
+                            return (
+                              <div
+                                key={docType.id}
+                                className="bg-white border border-zinc-200 rounded-2xl p-3.5 shadow-2xs hover:shadow-sm transition-all flex flex-col justify-between space-y-2.5 font-bold"
+                              >
+                                <div>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <h3 className="font-extrabold text-zinc-900 text-xs">
+                                      {language === 'ar' ? docType.ar.split(' / ')[0] : docType.en}
+                                    </h3>
+                                    <span className="text-[9px] text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded-full font-bold shrink-0">
+                                      {matchedTemplates.length} {language === 'ar' ? 'قوالب' : 'Templates'}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="text-[10px] text-zinc-500 font-bold block">
+                                    {language === 'ar' ? 'القالب الافتراضي النشط:' : 'Active Default Template:'}
+                                  </label>
+                                  {matchedTemplates.length === 0 ? (
+                                    <div className="p-2 bg-amber-50/50 border border-dashed border-amber-200 rounded-xl text-center">
+                                      <span className="text-[10px] text-amber-700 font-bold block">
+                                        {language === 'ar' ? 'لا يوجد أي قوالب مصممة لهذه العملية' : 'No templates designed for this operation'}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <select
+                                      value={defaultTemplate?.id || ''}
+                                      onChange={(e) => handleSetDefaultTemplate(e.target.value, docType.id)}
+                                      className="w-full bg-zinc-50 border border-zinc-200 px-2.5 py-1.5 rounded-lg text-[11px] font-bold outline-none focus:border-emerald-500 focus:bg-white transition-all"
+                                    >
+                                      <option value="">{language === 'ar' ? 'اختر قالب افتراضي...' : 'Select default template...'}</option>
+                                      {matchedTemplates.map(t => (
+                                        <option key={t.id} value={t.id}>{t.name} ({t.paper_size_id.toUpperCase()})</option>
+                                      ))}
+                                    </select>
+                                  )}
+                                </div>
+
+                                <div className="pt-2 border-t border-zinc-100 flex items-center justify-between gap-2">
+                                  {matchedTemplates.length > 0 && (
+                                    <div className="text-[10px] text-zinc-500 font-semibold truncate">
+                                      {defaultTemplate ? (
+                                        <span className="text-emerald-600 flex items-center gap-1 truncate">
+                                          <Check size={11} className="shrink-0" />
+                                          <span className="truncate">{defaultTemplate.name}</span>
+                                        </span>
+                                      ) : (
+                                        <span className="text-amber-600 font-bold">
+                                          {language === 'ar' ? 'لم يتم تحديد افتراضي' : 'No default'}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setFormData({
+                                        name: '',
+                                        description: '',
+                                        paper_size_id: 'a4',
+                                        orientation: 'portrait',
+                                        margin_top: 10,
+                                        margin_bottom: 10,
+                                        margin_left: 10,
+                                        margin_right: 10,
+                                        is_active: true,
+                                        customWidth: 210,
+                                        customHeight: 297,
+                                        customUnit: 'mm',
+                                        document_type: docType.id,
+                                        is_default: matchedTemplates.length === 0,
+                                        print_profile_id: ''
+                                      });
+                                      const targetLayout = JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
+                                      setDesignerLayout(targetLayout);
+                                      setHistory([JSON.parse(JSON.stringify(targetLayout))]);
+                                      setHistoryIndex(0);
+                                      setEditingTemplate(null);
+                                      setSelectedElementId(null);
+                                      setSelectedSection(null);
+                                      setPreviewMode(false);
+                                      setView('create');
+                                    }}
+                                    className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-lg text-[10px] font-black transition-all ml-auto shrink-0 cursor-pointer"
+                                  >
+                                    <Plus size={11} />
+                                    <span>{language === 'ar' ? 'إضافة قالب' : 'Add Template'}</span>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     );
@@ -6352,14 +6554,14 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                         <div className="space-y-1 pt-1">
                           <div className="flex justify-between text-[10px] font-bold text-zinc-500">
                             <span>{language === 'ar' ? 'زاوية دوران العلامة' : 'Watermark Rotation'}</span>
-                            <span>{designerLayout.watermarkRotation ?? -45}°</span>
+                            <span>{designerLayout.watermarkRotation ?? 0}°</span>
                           </div>
                           <input
                             type="range"
                             min="-180"
                             max="180"
                             className="w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
-                            value={designerLayout.watermarkRotation ?? -45}
+                            value={designerLayout.watermarkRotation ?? 0}
                             onChange={(e) => updateLayoutWithHistory({ ...designerLayout, watermarkRotation: parseInt(e.target.value) })}
                           />
                         </div>
@@ -6382,10 +6584,14 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                             }
                           }}
                         >
-                          {DOCUMENT_TYPES.map(doc => (
-                            <option key={doc.id} value={doc.id}>
-                              {language === 'ar' ? doc.ar : doc.en}
-                            </option>
+                          {TEMPLATE_MENU_GROUPS.map(menu => (
+                            <optgroup key={menu.id} label={language === 'ar' ? menu.ar : menu.en}>
+                              {DOCUMENT_TYPES.filter(d => d.menuId === menu.id).map(doc => (
+                                <option key={doc.id} value={doc.id}>
+                                  {language === 'ar' ? doc.ar : doc.en}
+                                </option>
+                              ))}
+                            </optgroup>
                           ))}
                         </select>
                       </div>
