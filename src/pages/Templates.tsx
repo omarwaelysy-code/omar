@@ -37,7 +37,7 @@ interface PaperSize {
 
 interface TemplateElement {
   id: string;
-  type: 'text' | 'image' | 'logo' | 'line' | 'rectangle' | 'circle' | 'barcode' | 'qr' | 'variable' | 'field';
+  type: 'text' | 'image' | 'logo' | 'line' | 'rectangle' | 'circle' | 'barcode' | 'qr' | 'variable' | 'field' | 'signature' | 'page_number' | 'date' | 'time';
   x: number; // internally stored in mm
   y: number; // internally stored in mm
   width: number; // internally stored in mm
