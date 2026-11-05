@@ -608,7 +608,7 @@ export function TemplateRenderer({
           })()}
           {layout.watermarkEnabled !== false && (layout.watermarkImage || layout.watermarkFileUrl) && (
             <div
-              className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0"
+              className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden"
               style={{
                 opacity: layout.watermarkOpacity ?? 0.15,
                 filter: layout.watermarkColorMode === 'bw' ? 'grayscale(100%)' : 'none'
@@ -618,11 +618,11 @@ export function TemplateRenderer({
                 <img
                   src={layout.watermarkImage}
                   alt="watermark"
+                  className="w-full h-full"
                   style={{
-                    transform: `rotate(${layout.watermarkRotation ?? -45}deg)`,
-                    maxWidth: '55%',
-                    maxHeight: '55%',
-                    objectFit: 'contain'
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'fill'
                   }}
                 />
               ) : layout.watermarkFileUrl && (layout.watermarkFileType === 'application/pdf' || layout.watermarkFileUrl.startsWith('data:application/pdf')) ? (
@@ -630,9 +630,8 @@ export function TemplateRenderer({
                   src={`${layout.watermarkFileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
                   type="application/pdf"
                   style={{
-                    transform: `rotate(${layout.watermarkRotation ?? 0}deg)`,
-                    width: '70%',
-                    height: '70%'
+                    width: '100%',
+                    height: '100%'
                   }}
                 />
               ) : null}

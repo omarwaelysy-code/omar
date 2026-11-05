@@ -453,8 +453,6 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           if (base64Wm) {
             try {
               const wmBuf = Buffer.from(base64Wm, 'base64');
-              const maxW = doc.page.width * 0.55;
-              const maxH = doc.page.height * 0.55;
               doc.save();
               try {
                 if (typeof (doc as any).opacity === 'function') {
@@ -462,11 +460,9 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
                 } else {
                   doc.fillOpacity(wmOpacity);
                 }
-                doc.rotate(wmRotation, { origin: [centerX, centerY] });
-                doc.image(wmBuf, centerX - maxW / 2, centerY - maxH / 2, {
-                  fit: [maxW, maxH],
-                  align: 'center',
-                  valign: 'center'
+                doc.image(wmBuf, 0, 0, {
+                  width: doc.page.width,
+                  height: doc.page.height
                 });
               } finally {
                 doc.restore();

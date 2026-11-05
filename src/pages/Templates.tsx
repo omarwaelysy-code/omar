@@ -193,7 +193,7 @@ const DEFAULT_LAYOUT: TemplateLayout = {
   watermarkEnabled: true,
   watermarkOpacity: 0.15,
   watermarkColorMode: 'color',
-  watermarkRotation: -45,
+  watermarkRotation: 0,
   header: [],
   footer: [],
   details: {
@@ -2181,7 +2181,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
         watermarkFileSize: file.size,
         watermarkOpacity: designerLayout.watermarkOpacity ?? 0.15,
         watermarkColorMode: currentColorMode,
-        watermarkRotation: designerLayout.watermarkRotation ?? (isPdf ? 0 : -45)
+        watermarkRotation: 0
       };
 
       updateLayoutWithHistory(updated);
@@ -4549,7 +4549,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                     )}
                     {designerLayout.watermarkEnabled !== false && (designerLayout.watermarkImage || designerLayout.watermarkFileUrl) && (
                       <div
-                        className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0"
+                        className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden"
                         style={{
                           opacity: designerLayout.watermarkOpacity ?? 0.15,
                           filter: designerLayout.watermarkColorMode === 'bw' ? 'grayscale(100%)' : 'none',
@@ -4559,11 +4559,11 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                           <img
                             src={designerLayout.watermarkImage}
                             alt="watermark"
+                            className="w-full h-full"
                             style={{
-                              transform: `rotate(${designerLayout.watermarkRotation ?? -45}deg)`,
-                              maxWidth: '55%',
-                              maxHeight: '55%',
-                              objectFit: 'contain'
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'fill'
                             }}
                           />
                         ) : designerLayout.watermarkFileUrl && (designerLayout.watermarkFileType === 'application/pdf' || designerLayout.watermarkFileUrl.startsWith('data:application/pdf')) ? (
@@ -4571,9 +4571,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                             src={`${designerLayout.watermarkFileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
                             type="application/pdf"
                             style={{
-                              transform: `rotate(${designerLayout.watermarkRotation ?? 0}deg)`,
-                              width: '70%',
-                              height: '70%'
+                              width: '100%',
+                              height: '100%'
                             }}
                           />
                         ) : null}
@@ -4858,12 +4857,12 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                           <img
                             src={designerLayout.watermarkImage}
                             alt="watermark_mock"
+                            className="w-full h-full"
                             style={{
-                              transform: `rotate(${designerLayout.watermarkRotation ?? -45}deg)`,
                               opacity: designerLayout.watermarkOpacity ?? 0.15,
-                              maxWidth: '55%',
-                              maxHeight: '55%',
-                              objectFit: 'contain'
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'fill'
                             }}
                           />
                         ) : designerLayout.watermarkFileUrl && (designerLayout.watermarkFileType === 'application/pdf' || designerLayout.watermarkFileUrl.startsWith('data:application/pdf')) ? (
@@ -4871,10 +4870,9 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                             src={`${designerLayout.watermarkFileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
                             type="application/pdf"
                             style={{
-                              transform: `rotate(${designerLayout.watermarkRotation ?? 0}deg)`,
                               opacity: designerLayout.watermarkOpacity ?? 0.15,
-                              width: '70%',
-                              height: '70%'
+                              width: '100%',
+                              height: '100%'
                             }}
                           />
                         ) : null}
