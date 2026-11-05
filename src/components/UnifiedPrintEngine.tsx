@@ -4,6 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { X, Printer, Download, FileText, Settings, Sliders } from 'lucide-react';
 import { TemplateRenderer, normalizeDocumentData, parseTemplateLayout } from './TemplateRenderer';
+import { getDefaultLayoutForDocumentType, isSystemTemplateLayoutOutdated } from '../utils/defaultTemplateLayouts';
 import { useNotification } from '../contexts/NotificationContext';
 import { PaperSize, Template, PrintProfile } from '../types';
 
@@ -385,10 +386,10 @@ export function UnifiedPrintEngine() {
 
         if (!activeTemplate) {
           activeTemplate = matchedTemplates.find(t => t.is_system) || {
-            id: 'default-system-invoice',
+            id: `default-${opType}`,
             company_id: user?.company_id || '',
             name: language === 'ar' ? 'قالب النظام الافتراضي' : 'Default System Template',
-            description: 'Pristine original system invoice layout',
+            description: 'Pristine original system layout',
             paper_size_id: 'a4',
             orientation: 'portrait',
             margin_top: 10,
@@ -399,7 +400,7 @@ export function UnifiedPrintEngine() {
             is_system: true,
             is_active: true,
             document_type: opType,
-            layout: DEFAULT_TEMPLATE_LAYOUT,
+            layout: getDefaultLayoutForDocumentType(opType),
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           };
@@ -420,7 +421,7 @@ export function UnifiedPrintEngine() {
             margin_left: 10,
             margin_right: 10,
             is_active: true,
-            layout: DEFAULT_TEMPLATE_LAYOUT
+            layout: getDefaultLayoutForDocumentType(opType)
           };
         }
         setSelectedTemplate(activeTemplate);
@@ -994,7 +995,11 @@ export function UnifiedPrintEngine() {
             ) : selectedTemplate && normalized ? (
               <div id="unified-print-capture-area" className="bg-white shadow-xl">
                 <TemplateRenderer
-                  layout={(selectedTemplate.is_default || selectedTemplate.is_system) ? DEFAULT_TEMPLATE_LAYOUT : (selectedTemplate.layout || DEFAULT_TEMPLATE_LAYOUT)}
+                  layout={
+                    isSystemTemplateLayoutOutdated(operationType, selectedTemplate.layout)
+                      ? getDefaultLayoutForDocumentType(operationType)
+                      : (selectedTemplate.layout || getDefaultLayoutForDocumentType(operationType))
+                  }
                   data={normalized}
                   scale={2.2} // Stable preview scale
                   margin={activeMargins}

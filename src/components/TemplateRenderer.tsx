@@ -99,6 +99,7 @@ export interface NormalizedDocument {
   branch_name?: string;
   user_name?: string;
   date?: string;
+  due_date?: string;
   time?: string;
   current_date?: string;
   current_time?: string;
@@ -114,6 +115,20 @@ export interface NormalizedDocument {
   employee_name?: string;
   currency_code?: string;
   payment_method?: string;
+  amount_in_words?: string;
+  description?: string;
+  from_warehouse?: string;
+  to_warehouse?: string;
+  warehouse_name?: string;
+  debit_account?: string;
+  credit_account?: string;
+  adjustment_account?: string;
+  from_account?: string;
+  to_account?: string;
+  bank_name?: string;
+  cheque_number?: string;
+  bank_account?: string;
+  counter_account?: string;
   subtotal?: number;
   discount_amount?: number;
   vat_amount?: number;
@@ -142,6 +157,11 @@ export interface NormalizedDocument {
     withholding_tax_rate?: string;
     withholding_tax_amount?: number;
     total: number;
+    description?: string;
+    warehouse_name?: string;
+    due_date?: string;
+    debit?: number;
+    credit?: number;
   }>;
   dynamicFields?: { [key: string]: string };
 }
@@ -363,22 +383,27 @@ export function normalizeDocumentData(
       total: Number(itm.total || 0)
     }));
   } 
-  else if (type === 'receipt_vouchers' || type === 'payment_vouchers') {
-    doc.document_number = data.internal_reference || data.voucher_number || data.number;
+  else if (type === 'receipt_vouchers' || type === 'payment_vouchers' || type === 'cash_transfers') {
+    doc.document_number = data.internal_reference || data.voucher_number || data.number || data.document_number;
     doc.currency_code = (data.currency || data.currency_code || doc.currency_code || 'EGP').toUpperCase();
-    doc.customer_name = data.customer_name || '';
-    doc.supplier_name = data.supplier_name || '';
-    doc.subtotal = Number(data.amount || 0);
+    doc.customer_name = data.customer_name || data.party_name || '';
+    doc.supplier_name = data.supplier_name || data.party_name || '';
+    doc.description = data.description || data.notes || '';
+    doc.amount_in_words = data.amount_in_words || '';
+    doc.from_account = data.from_account_name || data.from_account || '';
+    doc.to_account = data.to_account_name || data.to_account || '';
+    doc.subtotal = Number(data.amount || data.total_amount || 0);
     doc.discount_amount = 0;
     doc.vat_amount = 0;
-    doc.net_total = Number(data.amount || 0);
-    doc.paid_amount = Number(data.amount || 0);
+    doc.net_total = Number(data.amount || data.total_amount || 0);
+    doc.paid_amount = Number(data.amount || data.total_amount || 0);
     doc.remaining_amount = 0;
 
     const itemsRaw = data.items || [];
     doc.items = itemsRaw.map((itm: any) => ({
-      product_code: itm.account_id || '-',
+      product_code: itm.account_code || itm.account_id || '-',
       product_name: itm.account_name || itm.description || '-',
+      description: itm.description || itm.notes || '-',
       barcode: '-',
       quantity: 1,
       unit: '-',
@@ -388,19 +413,23 @@ export function normalizeDocumentData(
       total: Number(itm.amount || 0)
     }));
   } 
-  else if (type === 'journal_entries') {
-    doc.document_number = data.entry_number;
+  else if (type === 'journal_entries' || type === 'journal_reversal') {
+    doc.document_number = data.entry_number || data.document_number;
+    doc.description = data.description || data.notes || '';
     doc.subtotal = Number(data.total_debit || 0);
     doc.discount_amount = 0;
     doc.vat_amount = 0;
-    doc.net_total = Number(data.total_debit || 0);
+    doc.net_total = Number(data.total_credit || data.total_debit || 0);
     doc.paid_amount = Number(data.total_debit || 0);
     doc.remaining_amount = 0;
 
-    const itemsRaw = data.journal_entry_lines || data.lines || [];
+    const itemsRaw = data.journal_entry_lines || data.lines || data.items || [];
     doc.items = itemsRaw.map((itm: any) => ({
-      product_code: itm.account_id || '-',
+      product_code: itm.account_code || itm.account_id || '-',
       product_name: itm.account_name || itm.description || '-',
+      description: itm.description || '-',
+      debit: Number(itm.debit || 0),
+      credit: Number(itm.credit || 0),
       barcode: '-',
       quantity: 1,
       unit: '-',
@@ -408,6 +437,48 @@ export function normalizeDocumentData(
       discount: 0,
       vat_amount: 0,
       total: Number(itm.debit > 0 ? itm.debit : itm.credit)
+    }));
+  }
+  else {
+    // Generic handler for Cheques, Warehouses, Stock Balances/Adjustments, Settlements, Discounts, Fixed Assets, Flexible Operations, ETA
+    doc.document_number = data.document_number || data.cheque_number || data.transfer_number || data.receipt_number || data.adjustment_number || data.settlement_number || data.invoice_number || data.id || '';
+    doc.customer_name = data.customer_name || data.beneficiary_name || data.party_name || '';
+    doc.supplier_name = data.supplier_name || data.beneficiary_name || data.party_name || '';
+    doc.due_date = data.due_date || '';
+    doc.description = data.description || data.notes || data.reason || '';
+    doc.amount_in_words = data.amount_in_words || '';
+    doc.from_warehouse = data.from_warehouse_name || data.from_warehouse || '';
+    doc.to_warehouse = data.to_warehouse_name || data.to_warehouse || '';
+    doc.warehouse_name = data.warehouse_name || '';
+    doc.debit_account = data.debit_account_name || data.debit_account || '';
+    doc.credit_account = data.credit_account_name || data.credit_account || '';
+    doc.adjustment_account = data.adjustment_account_name || data.adjustment_account || '';
+    doc.bank_name = data.bank_name || '';
+    doc.cheque_number = data.cheque_number || doc.document_number || '';
+    doc.bank_account = data.bank_account_name || data.bank_account || '';
+    doc.counter_account = data.counter_account_name || data.counter_account || '';
+    const amt = Number(data.total_amount ?? data.amount ?? data.net_total ?? data.subtotal ?? 0);
+    doc.subtotal = Number(data.subtotal ?? amt);
+    doc.discount_amount = Number(data.discount_amount || 0);
+    doc.vat_amount = Number(data.tax_amount || data.vat_amount || 0);
+    doc.net_total = amt;
+    doc.paid_amount = amt;
+    doc.remaining_amount = 0;
+
+    const itemsRaw = data.items || data.lines || [];
+    doc.items = itemsRaw.map((itm: any) => ({
+      product_code: resolveCode(itm) !== '-' ? resolveCode(itm) : (itm.cheque_number || itm.account_code || itm.asset_code || '-'),
+      product_name: itm.product_name || itm.bank_name || itm.account_name || itm.asset_name || itm.description || '-',
+      description: itm.description || itm.notes || '-',
+      warehouse_name: itm.warehouse_name || doc.warehouse_name || '-',
+      due_date: itm.due_date || doc.due_date || '-',
+      barcode: itm.barcode || '-',
+      quantity: Number(itm.quantity ?? itm.qty_diff ?? 1),
+      unit: itm.unit || itm.status || '-',
+      unit_price: Number(itm.unit_price ?? itm.unit_cost ?? itm.amount ?? 0),
+      discount: Number(itm.discount || 0),
+      vat_amount: Number(itm.vat_amount || 0),
+      total: Number(itm.total ?? itm.amount ?? (Number(itm.quantity || 1) * Number(itm.unit_price || itm.unit_cost || 0)))
     }));
   }
 

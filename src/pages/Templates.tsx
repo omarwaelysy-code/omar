@@ -19,6 +19,11 @@ import QRCode from 'react-qr-code';
 import BarcodeComponent from 'react-barcode';
 import { Dashboard } from './Dashboard';
 import { AttachmentPreviewModal, ChequeAttachmentData } from '../components/common/AttachmentPreviewModal';
+import {
+  getDefaultLayoutForDocumentType,
+  isSystemTemplateLayoutOutdated,
+  getPreviewDataForDocumentType,
+} from '../utils/defaultTemplateLayouts';
 
 interface PaperSize {
   id: string;
@@ -292,36 +297,57 @@ const DYNAMIC_VARIABLES = {
     { key: 'company_name', arLabel: 'اسم الشركة', enLabel: 'Company Name' },
     { key: 'branch_name', arLabel: 'الفرع', enLabel: 'Branch' },
     { key: 'user_name', arLabel: 'المستخدم الحالي', enLabel: 'User' },
-    { key: 'date', arLabel: 'التاريخ الحالي', enLabel: 'Date' },
+    { key: 'date', arLabel: 'تاريخ المستند', enLabel: 'Date' },
+    { key: 'due_date', arLabel: 'تاريخ الاستحقاق', enLabel: 'Due Date' },
     { key: 'time', arLabel: 'الوقت الحالي', enLabel: 'Time' },
   ],
   invoice: [
-    { key: 'document_number', arLabel: 'رقم الفاتورة/المستند', enLabel: 'Invoice Number' },
-    { key: 'customer_name', arLabel: 'اسم العميل', enLabel: 'Customer' },
-    { key: 'supplier_name', arLabel: 'اسم المورد', enLabel: 'Supplier' },
+    { key: 'document_number', arLabel: 'رقم المستند / السند', enLabel: 'Document Number' },
+    { key: 'customer_name', arLabel: 'اسم العميل / المستلم', enLabel: 'Customer' },
+    { key: 'customer_tax_number', arLabel: 'الرقم الضريبي للعميل', enLabel: 'Customer Tax No' },
+    { key: 'supplier_name', arLabel: 'اسم المورد / المستفيد', enLabel: 'Supplier' },
+    { key: 'supplier_tax_number', arLabel: 'الرقم الضريبي للمورد', enLabel: 'Supplier Tax No' },
     { key: 'currency_code', arLabel: 'العملة', enLabel: 'Currency' },
-    { key: 'payment_method', arLabel: 'طريقة الدفع', enLabel: 'Payment Method' },
+    { key: 'payment_method', arLabel: 'طريقة الدفع / الحساب', enLabel: 'Payment Method' },
+    { key: 'amount_in_words', arLabel: 'المبلغ بالحروف (التفقيط)', enLabel: 'Amount in Words' },
+    { key: 'description', arLabel: 'البيان / الملاحظات', enLabel: 'Description' },
+    { key: 'cheque_number', arLabel: 'رقم الشيك', enLabel: 'Cheque No' },
+    { key: 'bank_name', arLabel: 'اسم البنك', enLabel: 'Bank Name' },
+    { key: 'bank_account', arLabel: 'حساب البنك', enLabel: 'Bank Account' },
+    { key: 'counter_account', arLabel: 'الحساب المقابل', enLabel: 'Counter Account' },
+    { key: 'warehouse_name', arLabel: 'المستودع', enLabel: 'Warehouse' },
+    { key: 'from_warehouse', arLabel: 'من المستودع', enLabel: 'From Warehouse' },
+    { key: 'to_warehouse', arLabel: 'إلى المستودع', enLabel: 'To Warehouse' },
+    { key: 'debit_account', arLabel: 'الحساب المدين', enLabel: 'Debit Account' },
+    { key: 'credit_account', arLabel: 'الحساب الدائن', enLabel: 'Credit Account' },
+    { key: 'original_entry_number', arLabel: 'رقم القيد المرتبط', enLabel: 'Linked Entry No' },
+    { key: 'original_doc_number', arLabel: 'رقم المستند المرجعي', enLabel: 'Reference Doc No' },
   ],
   totals: [
-    { key: 'subtotal', arLabel: 'الإجمالي الفرعي', enLabel: 'Subtotal' },
+    { key: 'subtotal', arLabel: 'الإجمالي الفرعي / المدين', enLabel: 'Subtotal / Debit' },
     { key: 'discount_amount', arLabel: 'إجمالي الخصم', enLabel: 'Discount' },
     { key: 'vat_amount', arLabel: 'ضريبة القيمة المضافة', enLabel: 'VAT' },
-    { key: 'net_total', arLabel: 'الإجمالي النهائي', enLabel: 'Net Total' },
+    { key: 'net_total', arLabel: 'الصافي النهائي / المبلغ', enLabel: 'Net Total / Amount' },
     { key: 'paid_amount', arLabel: 'المبلغ المدفوع', enLabel: 'Paid' },
     { key: 'remaining_amount', arLabel: 'المبلغ المتبقي', enLabel: 'Remaining' },
   ]
 };
 
 const DETAILS_COLUMNS_PRESETS = [
-  { id: 'product_code', arLabel: 'كود الصنف', enLabel: 'Item Code', field: 'product_code' },
-  { id: 'product_name', arLabel: 'اسم الصنف', enLabel: 'Item Name', field: 'product_name' },
+  { id: 'product_code', arLabel: 'كود الصنف / الحساب / الشيك', enLabel: 'Code / Account / Cheque No', field: 'product_code' },
+  { id: 'product_name', arLabel: 'اسم الصنف / الحساب / البنك', enLabel: 'Item / Account / Bank Name', field: 'product_name' },
+  { id: 'description', arLabel: 'البيان والتفاصيل', enLabel: 'Description / Details', field: 'description' },
+  { id: 'warehouse_name', arLabel: 'المستودع', enLabel: 'Warehouse', field: 'warehouse_name' },
   { id: 'barcode', arLabel: 'الباركود', enLabel: 'Barcode', field: 'barcode' },
-  { id: 'quantity', arLabel: 'الكمية', enLabel: 'Qty', field: 'quantity' },
-  { id: 'unit', arLabel: 'الوحدة', enLabel: 'Unit', field: 'unit' },
-  { id: 'unit_price', arLabel: 'سعر الوحدة', enLabel: 'Unit Price', field: 'unit_price' },
+  { id: 'quantity', arLabel: 'الكمية / فرق الكمية', enLabel: 'Qty / Diff', field: 'quantity' },
+  { id: 'unit', arLabel: 'الوحدة / الحالة', enLabel: 'Unit / Status', field: 'unit' },
+  { id: 'due_date', arLabel: 'تاريخ الاستحقاق', enLabel: 'Due Date', field: 'due_date' },
+  { id: 'unit_price', arLabel: 'سعر / تكلفة الوحدة', enLabel: 'Unit Price / Cost', field: 'unit_price' },
   { id: 'discount', arLabel: 'الخصم', enLabel: 'Discount', field: 'discount' },
   { id: 'vat_amount', arLabel: 'قيمة الضريبة', enLabel: 'VAT', field: 'vat_amount' },
-  { id: 'total', arLabel: 'الإجمالي', enLabel: 'Total', field: 'total' },
+  { id: 'debit', arLabel: 'مدين (Debit)', enLabel: 'Debit', field: 'debit' },
+  { id: 'credit', arLabel: 'دائن (Credit)', enLabel: 'Credit', field: 'credit' },
+  { id: 'total', arLabel: 'الإجمالي / المبلغ', enLabel: 'Total / Amount', field: 'total' },
 ];
 
 // Unit conversions
@@ -1236,6 +1262,26 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
   const ensureSystemDefaultTemplates = async (existingTemplates: Template[], companyId: string) => {
     const updatedList = [...existingTemplates];
+
+    // 1. Upgrade any existing system default template that still has an empty/outdated layout
+    for (let i = 0; i < updatedList.length; i++) {
+      const tmpl = updatedList[i];
+      if (isProtectedSystemTemplate(tmpl) && tmpl.document_type) {
+        if (isSystemTemplateLayoutOutdated(tmpl.document_type, tmpl.layout)) {
+          const properLayout = getDefaultLayoutForDocumentType(tmpl.document_type);
+          updatedList[i] = { ...tmpl, layout: properLayout };
+          if (tmpl.id && !tmpl.id.startsWith('default-')) {
+            try {
+              await dbService.update('templates', tmpl.id, { layout: properLayout });
+            } catch (err) {
+              console.warn(`Could not persist upgraded default layout for ${tmpl.document_type}`, err);
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Create any missing system default templates for the 33 document types
     const missingDocs = DOCUMENT_TYPES.filter(doc => {
       return !updatedList.some(t => t.document_type === doc.id && isProtectedSystemTemplate(t));
     });
@@ -1243,6 +1289,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
     if (missingDocs.length > 0) {
       const createdTemplates = await Promise.all(
         missingDocs.map(async (doc) => {
+          const properLayout = getDefaultLayoutForDocumentType(doc.id);
           const payload = {
             name: language === 'ar' ? doc.defaultNameAr : doc.defaultNameEn,
             description: language === 'ar' ? `القالب الافتراضي المحمي الخاص بالنظام (${doc.menuAr})` : `Protected System Default Template (${doc.menuEn})`,
@@ -1253,7 +1300,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
             margin_left: 10,
             margin_right: 10,
             is_active: true,
-            layout: DEFAULT_LAYOUT,
+            layout: properLayout,
             company_id: companyId,
             document_type: doc.id,
             is_default: !updatedList.some(t => t.document_type === doc.id && t.is_default),
@@ -2356,8 +2403,15 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       print_profile_id: template.print_profile_id || ''
     });
 
+    const docType = template.document_type || 'invoices';
     const rawLayout = typeof template.layout === 'string' ? JSON.parse(template.layout) : template.layout;
-    const targetLayout = rawLayout ? JSON.parse(JSON.stringify(rawLayout)) : JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
+    const shouldUseDefaultPreset =
+      !rawLayout ||
+      (isProtectedSystemTemplate(template) && isSystemTemplateLayoutOutdated(docType, rawLayout)) ||
+      (!rawLayout.header?.length && !rawLayout.footer?.length);
+    const targetLayout = shouldUseDefaultPreset
+      ? JSON.parse(JSON.stringify(getDefaultLayoutForDocumentType(docType)))
+      : JSON.parse(JSON.stringify(rawLayout));
     setDesignerLayout(targetLayout);
     setHistory([JSON.parse(JSON.stringify(targetLayout))]);
     setHistoryIndex(0);
@@ -2375,6 +2429,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       ? (language === 'ar' ? `نسخة مخصصة من ${template.name}` : `Custom copy of ${template.name}`)
       : (template.description || '');
 
+    const docType = template.document_type || 'invoices';
     setFormData({
       name: `${template.name} - ${language === 'ar' ? 'نسخة' : 'Copy'}`,
       description: cleanDescription,
@@ -2388,13 +2443,19 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       customWidth: isCustom ? Number(selectedSize.width) : 210,
       customHeight: isCustom ? Number(selectedSize.height) : 297,
       customUnit: isCustom ? selectedSize.unit : 'mm',
-      document_type: template.document_type || 'invoices',
+      document_type: docType,
       is_default: false, // Do not copy the default template status automatically
       print_profile_id: template.print_profile_id || ''
     });
 
     const rawLayout = typeof template.layout === 'string' ? JSON.parse(template.layout) : template.layout;
-    const targetLayout = rawLayout ? JSON.parse(JSON.stringify(rawLayout)) : JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
+    const shouldUseDefaultPreset =
+      !rawLayout ||
+      (isProtectedSystemTemplate(template) && isSystemTemplateLayoutOutdated(docType, rawLayout)) ||
+      (!rawLayout.header?.length && !rawLayout.footer?.length);
+    const targetLayout = shouldUseDefaultPreset
+      ? JSON.parse(JSON.stringify(getDefaultLayoutForDocumentType(docType)))
+      : JSON.parse(JSON.stringify(rawLayout));
     setDesignerLayout(targetLayout);
     setHistory([JSON.parse(JSON.stringify(targetLayout))]);
     setHistoryIndex(0);
@@ -2748,30 +2809,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
   const copiedTemplatesList = baseFilteredTemplates.filter(t => !isProtectedSystemTemplate(t));
   const filteredTemplates = templateTypeTab === 'default' ? defaultTemplatesList : copiedTemplatesList;
 
-  // Mock document data for Real Live Preview
-  const previewDocData = {
-    company_logo: company?.logo_url || '',
-    company_name: company?.name || 'مجموعة التطور الرقمي المحدودة',
-    branch_name: 'فرع الرياض الرئيسي',
-    user_name: user?.username || 'المشرف العام',
-    date: new Date().toLocaleDateString('ar-SA'),
-    time: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
-    document_number: 'INV-2026-90432',
-    customer_name: 'شركة قمم الشرق للمقاولات العامة',
-    supplier_name: 'مؤسسة الحلول البرمجية العالمية',
-    currency_code: 'SAR',
-    payment_method: 'مدى / Mada',
-    subtotal: 5850.00,
-    discount_amount: 350.00,
-    vat_amount: 825.00,
-    net_total: 6325.00,
-    paid_amount: 6325.00,
-    remaining_amount: 0.00,
-    items: [
-      { product_code: 'ITM-902', product_name: 'تراخيص سيرفر تداول مالي متقدم', barcode: '628045612378', quantity: 2, unit: 'رخصة', unit_price: 2500, discount: 250, vat_amount: 712.5, total: 5462.5 },
-      { product_code: 'ITM-503', product_name: 'خدمة إعداد وبدء تشغيل قواعد البيانات', barcode: 'N/A', quantity: 1, unit: 'ساعة', unit_price: 850, discount: 100, vat_amount: 112.5, total: 862.5 }
-    ]
-  };
+  // Mock document data for Real Live Preview matched to the active document type
+  const previewDocData = getPreviewDataForDocumentType(formData.document_type || 'invoices', company, user);
 
   const getBindingValueForPreview = (binding?: string) => {
     if (!binding) return '';
@@ -3096,7 +3135,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                             is_default: false,
                             print_profile_id: ''
                           });
-                          const targetLayout = JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
+                          const targetLayout = JSON.parse(JSON.stringify(getDefaultLayoutForDocumentType('invoices')));
                           setDesignerLayout(targetLayout);
                           setHistory([JSON.parse(JSON.stringify(targetLayout))]);
                           setHistoryIndex(0);
@@ -3683,7 +3722,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                                         is_default: matchedTemplates.length === 0,
                                         print_profile_id: ''
                                       });
-                                      const targetLayout = JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
+                                      const targetLayout = JSON.parse(JSON.stringify(getDefaultLayoutForDocumentType(docType.id)));
                                       setDesignerLayout(targetLayout);
                                       setHistory([JSON.parse(JSON.stringify(targetLayout))]);
                                       setHistoryIndex(0);
@@ -3865,6 +3904,48 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                   <option value="1.5">150%</option>
                   <option value="2.0">200%</option>
                 </select>
+
+                {/* Document Type Selector + Reset to Operation Default Layout */}
+                <div className="flex items-center gap-1.5 bg-zinc-50 border border-zinc-200 px-2 py-1 rounded-xl">
+                  <select
+                    className="bg-transparent text-xs font-bold text-zinc-700 outline-none cursor-pointer max-w-[180px]"
+                    value={formData.document_type || 'invoices'}
+                    onChange={(e) => {
+                      const newDocType = e.target.value;
+                      setFormData(prev => ({ ...prev, document_type: newDocType }));
+                      const matchedPreset = JSON.parse(JSON.stringify(getDefaultLayoutForDocumentType(newDocType)));
+                      updateLayoutWithHistory(matchedPreset);
+                    }}
+                    title={language === 'ar' ? 'نوع المستند / الحركة المرتبطة بالقالب' : 'Linked Document / Operation Type'}
+                  >
+                    {TEMPLATE_MENU_GROUPS.map(menu => (
+                      <optgroup key={menu.id} label={language === 'ar' ? menu.ar : menu.en}>
+                        {DOCUMENT_TYPES.filter(d => d.menuId === menu.id).map(doc => (
+                          <option key={doc.id} value={doc.id}>
+                            {language === 'ar' ? doc.ar.split(' / ')[0] : doc.en}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const defaultPreset = JSON.parse(JSON.stringify(getDefaultLayoutForDocumentType(formData.document_type || 'invoices')));
+                      updateLayoutWithHistory(defaultPreset);
+                      toast.success(
+                        language === 'ar'
+                          ? 'تم تحميل التصميم المتوافق مع الحركة بنجاح'
+                          : 'Operation-compatible template layout loaded'
+                      );
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-black transition-all cursor-pointer shrink-0"
+                    title={language === 'ar' ? 'إعادة ضبط التصميم ليتوافق مع نوع المستند/الحركة' : 'Reset layout to match document type'}
+                  >
+                    <RefreshCw size={11} />
+                    <span>{language === 'ar' ? 'توافق مع الحركة' : 'Sync Layout'}</span>
+                  </button>
+                </div>
 
                 {/* Preview Toggle */}
                 <button
@@ -5246,7 +5327,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                           </tr>
                         </thead>
                         <tbody>
-                          {[1, 2].map(rowIdx => (
+                          {previewDocData.items.map((item: any, rowIdx: number) => (
                             <tr 
                               key={rowIdx} 
                               style={{
@@ -5259,18 +5340,13 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                               {designerLayout.details.columns.map(col => (
                                 <td 
                                   key={col.id} 
-                                  className="border p-2 text-zinc-400"
+                                  className="border p-2 text-zinc-500"
                                   style={{
                                     borderColor: designerLayout.details.properties.borderColor || '#e4e4e7',
                                     padding: `${designerLayout.details.properties.paddingY ?? 2}px ${designerLayout.details.properties.paddingX ?? 2}px`
                                   }}
                                 >
-                                  {col.field === 'product_name' && `صنف تجريبي رقم ${rowIdx}`}
-                                  {col.field === 'product_code' && `PRD-00${rowIdx}`}
-                                  {col.field === 'quantity' && `${rowIdx * 2}`}
-                                  {col.field === 'unit_price' && `${rowIdx * 100}`}
-                                  {col.field === 'total' && `${rowIdx * 200}`}
-                                  {!['product_name', 'product_code', 'quantity', 'unit_price', 'total'].includes(col.field) && `[${col.label}]`}
+                                  {item[col.field] !== undefined ? String(item[col.field]) : `[${col.label}]`}
                                 </td>
                               ))}
                             </tr>
