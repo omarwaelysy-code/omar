@@ -330,6 +330,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         }
       }
 
+      let drawPageBackgroundAndWatermark = () => {};
+
       const addNewPage = () => {
         doc.addPage({
           size: isThermal ? [pageWidth, pageHeight] : 'A4',
@@ -338,6 +340,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             ? { top: 10, bottom: 10, left: 10, right: 10 }
             : { top: 40, bottom: 40, left: 30, right: 30 }
         });
+        drawPageBackgroundAndWatermark();
       };
 
       const paperWidthMm = isThermal ? (dto.customLayout?.paperWidth || 80) : (isLandscape ? 297 : 210);
@@ -415,6 +418,91 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           currentSegmentX += doc.widthOfString(seg.text);
         });
       };
+
+      // Draw custom template background image and watermark on current page (behind page content)
+      drawPageBackgroundAndWatermark = () => {
+        if (!dto.customLayout) return;
+        const cl = dto.customLayout;
+
+        // 1. Background image if present
+        if (cl.bgImage && typeof cl.bgImage === 'string' && cl.bgImage.startsWith('data:image')) {
+          const base64Bg = cl.bgImage.split(',')[1];
+          if (base64Bg) {
+            try {
+              const bgBuf = Buffer.from(base64Bg, 'base64');
+              doc.save();
+              doc.image(bgBuf, 0, 0, { width: doc.page.width, height: doc.page.height });
+              doc.restore();
+            } catch (e: any) {
+              console.error(`${STEP} Background image render error:`, e.message);
+            }
+          }
+        }
+
+        // 2. Watermark (only when watermarkEnabled !== false)
+        if (cl.watermarkEnabled === false) return;
+
+        const rawOpacity = Number(cl.watermarkOpacity ?? 0.15);
+        const wmOpacity = Math.max(0.01, Math.min(1, rawOpacity > 1 ? rawOpacity / 100 : rawOpacity));
+        const wmRotation = Number(cl.watermarkRotation ?? -45);
+        const centerX = doc.page.width / 2;
+        const centerY = doc.page.height / 2;
+
+        if (cl.watermarkImage && typeof cl.watermarkImage === 'string' && cl.watermarkImage.startsWith('data:image')) {
+          const base64Wm = cl.watermarkImage.split(',')[1];
+          if (base64Wm) {
+            try {
+              const wmBuf = Buffer.from(base64Wm, 'base64');
+              const maxW = doc.page.width * 0.55;
+              const maxH = doc.page.height * 0.55;
+              doc.save();
+              try {
+                if (typeof (doc as any).opacity === 'function') {
+                  (doc as any).opacity(wmOpacity);
+                } else {
+                  doc.fillOpacity(wmOpacity);
+                }
+                doc.rotate(wmRotation, { origin: [centerX, centerY] });
+                doc.image(wmBuf, centerX - maxW / 2, centerY - maxH / 2, {
+                  fit: [maxW, maxH],
+                  align: 'center',
+                  valign: 'center'
+                });
+              } finally {
+                doc.restore();
+                if (typeof (doc as any).opacity === 'function') {
+                  (doc as any).opacity(1);
+                }
+                doc.fillOpacity(1);
+              }
+            } catch (e: any) {
+              console.error(`${STEP} Watermark image render error:`, e.message);
+            }
+          }
+        }
+
+        if (cl.watermarkText && String(cl.watermarkText).trim() !== '') {
+          doc.save();
+          try {
+            doc.fillOpacity(wmOpacity);
+            doc.fillColor('#000000');
+            doc.rotate(wmRotation, { origin: [centerX, centerY] });
+            renderText(String(cl.watermarkText).trim(), centerX - 180, centerY - 12, {
+              width: 360,
+              align: 'center',
+              font: 'ArabicBold',
+              size: isThermal ? 16 : 32
+            });
+          } catch (_) {
+          } finally {
+            doc.restore();
+            doc.fillOpacity(1);
+          }
+        }
+      };
+
+      // Draw background & watermark on the initial page
+      drawPageBackgroundAndWatermark();
 
       // Draw Header Helper
       const drawHeader = (title: string, branchName = '', userName = '', dateStr = '') => {

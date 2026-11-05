@@ -54,9 +54,16 @@ export interface TemplateLayout {
   headerHeight: number;
   footerHeight: number;
   bgImage?: string;
+  watermarkEnabled?: boolean;
   watermarkText?: string;
   watermarkImage?: string;
+  watermarkOriginalImage?: string;
+  watermarkFileUrl?: string;
+  watermarkFileName?: string;
+  watermarkFileType?: string;
+  watermarkFileSize?: number;
   watermarkOpacity?: number;
+  watermarkColorMode?: 'color' | 'bw';
   watermarkRotation?: number;
   header: TemplateElement[];
   details: {
@@ -491,9 +498,16 @@ export function parseTemplateLayout(rawLayout: any): TemplateLayout {
     headerHeight: Number(layoutObj?.headerHeight ?? 75),
     footerHeight: Number(layoutObj?.footerHeight ?? 45),
     bgImage: layoutObj?.bgImage,
+    watermarkEnabled: layoutObj?.watermarkEnabled !== false,
     watermarkText: layoutObj?.watermarkText,
     watermarkImage: layoutObj?.watermarkImage,
+    watermarkOriginalImage: layoutObj?.watermarkOriginalImage,
+    watermarkFileUrl: layoutObj?.watermarkFileUrl,
+    watermarkFileName: layoutObj?.watermarkFileName,
+    watermarkFileType: layoutObj?.watermarkFileType,
+    watermarkFileSize: layoutObj?.watermarkFileSize,
     watermarkOpacity: layoutObj?.watermarkOpacity,
+    watermarkColorMode: layoutObj?.watermarkColorMode || 'color',
     watermarkRotation: layoutObj?.watermarkRotation,
     header: Array.isArray(layoutObj?.header) ? layoutObj.header : [],
     details: {
@@ -567,7 +581,8 @@ export function TemplateRenderer({
           {(() => {
             const isRevDoc = Boolean(data.is_reversal_doc || String(data.document_number || '').startsWith('REV-'));
             const isRev = Boolean(data.is_reversed);
-            const wmText = layout.watermarkText || (
+            const customWmText = layout.watermarkEnabled !== false ? layout.watermarkText : undefined;
+            const wmText = customWmText || (
               isRevDoc 
                 ? 'مستند حركة عكسية (Reversal Document)' 
                 : (isRev ? 'مستند معكوس (Reversed Document)' : null)
@@ -577,35 +592,50 @@ export function TemplateRenderer({
               <div
                 className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0"
                 style={{
-                  opacity: layout.watermarkOpacity ?? ((isRevDoc || isRev) ? 0.22 : 0.15),
-                  transform: `rotate(${layout.watermarkRotation ?? -32}deg)`,
-                  fontSize: `${(isRevDoc || isRev) ? 36 * scale : 48 * scale}px`,
+                  opacity: customWmText ? (layout.watermarkOpacity ?? 0.15) : ((isRevDoc || isRev) ? 0.22 : 0.15),
+                  transform: `rotate(${customWmText ? (layout.watermarkRotation ?? -45) : -32}deg)`,
+                  fontSize: `${(isRevDoc || isRev) && !customWmText ? 36 * scale : 48 * scale}px`,
                   fontWeight: 'bold',
-                  color: (isRevDoc || isRev) ? '#dc2626' : '#000000',
+                  color: (isRevDoc || isRev) && !customWmText ? '#dc2626' : '#000000',
                   textAlign: 'center',
-                  fontFamily: 'Cairo'
+                  fontFamily: 'Cairo',
+                  filter: layout.watermarkColorMode === 'bw' ? 'grayscale(100%)' : 'none'
                 }}
               >
                 {wmText}
               </div>
             );
           })()}
-          {layout.watermarkImage && (
+          {layout.watermarkEnabled !== false && (layout.watermarkImage || layout.watermarkFileUrl) && (
             <div
               className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0"
               style={{
                 opacity: layout.watermarkOpacity ?? 0.15,
+                filter: layout.watermarkColorMode === 'bw' ? 'grayscale(100%)' : 'none'
               }}
             >
-              <img
-                src={layout.watermarkImage}
-                alt="watermark"
-                style={{
-                  transform: `rotate(${layout.watermarkRotation ?? -45}deg)`,
-                  maxWidth: '45%',
-                  maxHeight: '45%'
-                }}
-              />
+              {layout.watermarkImage ? (
+                <img
+                  src={layout.watermarkImage}
+                  alt="watermark"
+                  style={{
+                    transform: `rotate(${layout.watermarkRotation ?? -45}deg)`,
+                    maxWidth: '55%',
+                    maxHeight: '55%',
+                    objectFit: 'contain'
+                  }}
+                />
+              ) : layout.watermarkFileUrl && (layout.watermarkFileType === 'application/pdf' || layout.watermarkFileUrl.startsWith('data:application/pdf')) ? (
+                <embed
+                  src={`${layout.watermarkFileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                  type="application/pdf"
+                  style={{
+                    transform: `rotate(${layout.watermarkRotation ?? 0}deg)`,
+                    width: '70%',
+                    height: '70%'
+                  }}
+                />
+              ) : null}
             </div>
           )}
 

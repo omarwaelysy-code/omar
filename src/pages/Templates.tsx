@@ -18,6 +18,7 @@ import { VARIABLE_REGISTRY } from '../components/VariableRegistry';
 import QRCode from 'react-qr-code';
 import BarcodeComponent from 'react-barcode';
 import { Dashboard } from './Dashboard';
+import { AttachmentPreviewModal, ChequeAttachmentData } from '../components/common/AttachmentPreviewModal';
 
 interface PaperSize {
   id: string;
@@ -72,9 +73,16 @@ interface TemplateLayout {
   headerHeight: number; // mm
   footerHeight: number; // mm
   bgImage?: string; // base64 or URL
+  watermarkEnabled?: boolean; // checkbox to enable/disable watermark display
   watermarkText?: string;
-  watermarkImage?: string;
-  watermarkOpacity?: number;
+  watermarkImage?: string; // rendered image dataURL (color or grayscale)
+  watermarkOriginalImage?: string; // original color image dataURL
+  watermarkFileUrl?: string; // original uploaded file dataURL (image or PDF) for preview & download
+  watermarkFileName?: string;
+  watermarkFileType?: string;
+  watermarkFileSize?: number;
+  watermarkOpacity?: number; // 0.01 to 1.0 (controlled by 1..100 slider)
+  watermarkColorMode?: 'color' | 'bw'; // 'color' (ألوان) or 'bw' (أسود وأبيض)
   watermarkRotation?: number;
   header: TemplateElement[];
   details: {
@@ -182,7 +190,9 @@ const DOCUMENT_TYPES = [
 const DEFAULT_LAYOUT: TemplateLayout = {
   headerHeight: 75,
   footerHeight: 45,
+  watermarkEnabled: true,
   watermarkOpacity: 0.15,
+  watermarkColorMode: 'color',
   watermarkRotation: -45,
   header: [],
   footer: [],
@@ -406,6 +416,9 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
   const headerCanvasRef = useRef<HTMLDivElement>(null);
   const footerCanvasRef = useRef<HTMLDivElement>(null);
+  const watermarkFileInputRef = useRef<HTMLInputElement>(null);
+  const [previewWatermarkAttachment, setPreviewWatermarkAttachment] = useState<ChequeAttachmentData | null>(null);
+  const [watermarkUploading, setWatermarkUploading] = useState(false);
 
   const [mouseDragState, setMouseDragState] = useState<{
     elementId: string;
@@ -2018,8 +2031,96 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
     updateLayoutWithHistory(updated);
   };
 
-  // Custom Background / Watermark Image uploader
+  // Convert image DataURL to grayscale DataURL for Black & White mode
+  const convertImageToGrayscale = (sourceDataUrl: string): Promise<string> => {
+    return new Promise((resolve) => {
+      if (!sourceDataUrl || !sourceDataUrl.startsWith('data:image')) {
+        resolve(sourceDataUrl);
+        return;
+      }
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || img.width || 800;
+          canvas.height = img.naturalHeight || img.height || 800;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(sourceDataUrl);
+            return;
+          }
+          ctx.drawImage(img, 0, 0);
+          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imgData.data;
+          for (let i = 0; i < data.length; i += 4) {
+            const avg = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+            data[i] = avg;
+            data[i + 1] = avg;
+            data[i + 2] = avg;
+          }
+          ctx.putImageData(imgData, 0, 0);
+          resolve(canvas.toDataURL('image/png'));
+        } catch (_) {
+          resolve(sourceDataUrl);
+        }
+      };
+      img.onerror = () => resolve(sourceDataUrl);
+      img.src = sourceDataUrl;
+    });
+  };
+
+  // Render first page of uploaded PDF file to high-res PNG DataURL
+  const renderPdfFirstPageToImage = async (file: File): Promise<string | null> => {
+    try {
+      let pdfjsLib = (window as any).pdfjsLib;
+      if (!pdfjsLib) {
+        await new Promise<void>((resolve, reject) => {
+          const existingScript = document.getElementById('pdfjs-cdn-script');
+          if (existingScript) {
+            if ((window as any).pdfjsLib) {
+              resolve();
+              return;
+            }
+            existingScript.addEventListener('load', () => resolve());
+            existingScript.addEventListener('error', () => reject(new Error('Failed to load pdf.js')));
+            return;
+          }
+          const script = document.createElement('script');
+          script.id = 'pdfjs-cdn-script';
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error('Failed to load pdf.js'));
+          document.head.appendChild(script);
+        });
+        pdfjsLib = (window as any).pdfjsLib;
+      }
+      if (!pdfjsLib) return null;
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const page = await pdf.getPage(1);
+      const viewport = page.getViewport({ scale: 2.0 });
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      return canvas.toDataURL('image/png');
+    } catch (err) {
+      console.warn('PDF watermark page render fallback:', err);
+      return null;
+    }
+  };
+
+  // Custom Background Image uploader
   const handleBgImageUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'bgImage' | 'watermarkImage') => {
+    if (field === 'watermarkImage') {
+      handleWatermarkUpload(e);
+      return;
+    }
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
@@ -2031,6 +2132,116 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
         updateLayoutWithHistory(updated);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  // Watermark File Uploader (supports Image or PDF)
+  const handleWatermarkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    const isImage = file.type.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif|svg|bmp)$/i.test(file.name);
+
+    if (!isPdf && !isImage) {
+      toast.error(language === 'ar' ? 'يرجى اختيار ملف صورة أو ملف PDF فقط' : 'Please select an Image or PDF file only');
+      return;
+    }
+
+    setWatermarkUploading(true);
+    try {
+      const fileDataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsDataURL(file);
+      });
+
+      let renderedImageDataUrl: string | null = null;
+      if (isPdf) {
+        renderedImageDataUrl = await renderPdfFirstPageToImage(file);
+      } else {
+        renderedImageDataUrl = fileDataUrl;
+      }
+
+      const currentColorMode = designerLayout.watermarkColorMode || 'color';
+      let finalWatermarkImg = renderedImageDataUrl || undefined;
+      if (currentColorMode === 'bw' && renderedImageDataUrl) {
+        finalWatermarkImg = await convertImageToGrayscale(renderedImageDataUrl);
+      }
+
+      const updated: TemplateLayout = {
+        ...designerLayout,
+        watermarkEnabled: true,
+        watermarkImage: finalWatermarkImg,
+        watermarkOriginalImage: renderedImageDataUrl || undefined,
+        watermarkFileUrl: fileDataUrl,
+        watermarkFileName: file.name,
+        watermarkFileType: isPdf ? 'application/pdf' : (file.type || 'image/png'),
+        watermarkFileSize: file.size,
+        watermarkOpacity: designerLayout.watermarkOpacity ?? 0.15,
+        watermarkColorMode: currentColorMode,
+        watermarkRotation: designerLayout.watermarkRotation ?? (isPdf ? 0 : -45)
+      };
+
+      updateLayoutWithHistory(updated);
+      toast.success(
+        language === 'ar'
+          ? `تم تحميل العلامة المائية (${file.name}) بنجاح`
+          : `Watermark (${file.name}) uploaded successfully`
+      );
+    } catch (err) {
+      console.error('Watermark upload error:', err);
+      toast.error(language === 'ar' ? 'فشل تحميل ملف العلامة المائية' : 'Failed to upload watermark file');
+    } finally {
+      setWatermarkUploading(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  // Switch Watermark Color Mode ('color' vs 'bw')
+  const handleWatermarkColorModeChange = async (mode: 'color' | 'bw') => {
+    const baseImg = designerLayout.watermarkOriginalImage || designerLayout.watermarkImage;
+    if (baseImg && baseImg.startsWith('data:image')) {
+      if (mode === 'bw') {
+        const bwImg = await convertImageToGrayscale(baseImg);
+        updateLayoutWithHistory({
+          ...designerLayout,
+          watermarkColorMode: 'bw',
+          watermarkOriginalImage: baseImg,
+          watermarkImage: bwImg
+        });
+      } else {
+        updateLayoutWithHistory({
+          ...designerLayout,
+          watermarkColorMode: 'color',
+          watermarkImage: baseImg
+        });
+      }
+    } else {
+      updateLayoutWithHistory({
+        ...designerLayout,
+        watermarkColorMode: mode
+      });
+    }
+  };
+
+  // Download saved Watermark File
+  const handleDownloadWatermark = () => {
+    const url = designerLayout.watermarkFileUrl || designerLayout.watermarkImage;
+    if (!url) return;
+    const isPdf = designerLayout.watermarkFileType === 'application/pdf' || url.startsWith('data:application/pdf');
+    const fileName = designerLayout.watermarkFileName || (isPdf ? 'watermark.pdf' : 'watermark.png');
+    try {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Download watermark error:', err);
+      window.open(url, '_blank');
     }
   };
 
@@ -2071,7 +2282,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       print_profile_id: template.print_profile_id || ''
     });
 
-    const targetLayout = template.layout ? JSON.parse(JSON.stringify(template.layout)) : JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
+    const rawLayout = typeof template.layout === 'string' ? JSON.parse(template.layout) : template.layout;
+    const targetLayout = rawLayout ? JSON.parse(JSON.stringify(rawLayout)) : JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
     setDesignerLayout(targetLayout);
     setHistory([JSON.parse(JSON.stringify(targetLayout))]);
     setHistoryIndex(0);
@@ -2104,7 +2316,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       print_profile_id: template.print_profile_id || ''
     });
 
-    const targetLayout = template.layout ? JSON.parse(JSON.stringify(template.layout)) : JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
+    const rawLayout = typeof template.layout === 'string' ? JSON.parse(template.layout) : template.layout;
+    const targetLayout = rawLayout ? JSON.parse(JSON.stringify(rawLayout)) : JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
     setDesignerLayout(targetLayout);
     setHistory([JSON.parse(JSON.stringify(targetLayout))]);
     setHistoryIndex(0);
@@ -4319,7 +4532,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                     }}
                   >
                     {/* Watermark */}
-                    {designerLayout.watermarkText && (
+                    {designerLayout.watermarkEnabled !== false && designerLayout.watermarkText && (
                       <div
                         className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0"
                         style={{
@@ -4328,27 +4541,42 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                           fontSize: '5vw',
                           fontWeight: 'bold',
                           color: '#000000',
+                          filter: designerLayout.watermarkColorMode === 'bw' ? 'grayscale(100%)' : 'none',
                         }}
                       >
                         {designerLayout.watermarkText}
                       </div>
                     )}
-                    {designerLayout.watermarkImage && (
+                    {designerLayout.watermarkEnabled !== false && (designerLayout.watermarkImage || designerLayout.watermarkFileUrl) && (
                       <div
                         className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0"
                         style={{
                           opacity: designerLayout.watermarkOpacity ?? 0.15,
+                          filter: designerLayout.watermarkColorMode === 'bw' ? 'grayscale(100%)' : 'none',
                         }}
                       >
-                        <img
-                          src={designerLayout.watermarkImage}
-                          alt="watermark"
-                          style={{
-                            transform: `rotate(${designerLayout.watermarkRotation ?? -45}deg)`,
-                            maxWidth: '40%',
-                            maxHeight: '40%'
-                          }}
-                        />
+                        {designerLayout.watermarkImage ? (
+                          <img
+                            src={designerLayout.watermarkImage}
+                            alt="watermark"
+                            style={{
+                              transform: `rotate(${designerLayout.watermarkRotation ?? -45}deg)`,
+                              maxWidth: '55%',
+                              maxHeight: '55%',
+                              objectFit: 'contain'
+                            }}
+                          />
+                        ) : designerLayout.watermarkFileUrl && (designerLayout.watermarkFileType === 'application/pdf' || designerLayout.watermarkFileUrl.startsWith('data:application/pdf')) ? (
+                          <embed
+                            src={`${designerLayout.watermarkFileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                            type="application/pdf"
+                            style={{
+                              transform: `rotate(${designerLayout.watermarkRotation ?? 0}deg)`,
+                              width: '70%',
+                              height: '70%'
+                            }}
+                          />
+                        ) : null}
                       </div>
                     )}
 
@@ -4606,33 +4834,50 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                     )}
 
                     {/* Watermark Mock Renderer */}
-                    {(designerLayout.watermarkText || designerLayout.watermarkImage) && (
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0 border border-dashed border-zinc-200">
+                    {designerLayout.watermarkEnabled !== false && (designerLayout.watermarkText || designerLayout.watermarkImage || designerLayout.watermarkFileUrl) && (
+                      <div
+                        className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0 border border-dashed border-zinc-200"
+                        style={{
+                          filter: designerLayout.watermarkColorMode === 'bw' ? 'grayscale(100%)' : 'none'
+                        }}
+                      >
                         {designerLayout.watermarkText && (
                           <span
                             className="font-bold"
                             style={{
                               fontSize: '5vw',
-                              opacity: (designerLayout.watermarkOpacity ?? 0.15) * 1.5,
+                              opacity: designerLayout.watermarkOpacity ?? 0.15,
                               transform: `rotate(${designerLayout.watermarkRotation ?? -45}deg)`,
-                              color: '#d4d4d8'
+                              color: '#000000'
                             }}
                           >
                             {designerLayout.watermarkText}
                           </span>
                         )}
-                        {designerLayout.watermarkImage && (
+                        {designerLayout.watermarkImage ? (
                           <img
                             src={designerLayout.watermarkImage}
                             alt="watermark_mock"
                             style={{
                               transform: `rotate(${designerLayout.watermarkRotation ?? -45}deg)`,
-                              opacity: (designerLayout.watermarkOpacity ?? 0.15) * 1.5,
-                              maxWidth: '30%',
-                              maxHeight: '30%'
+                              opacity: designerLayout.watermarkOpacity ?? 0.15,
+                              maxWidth: '55%',
+                              maxHeight: '55%',
+                              objectFit: 'contain'
                             }}
                           />
-                        )}
+                        ) : designerLayout.watermarkFileUrl && (designerLayout.watermarkFileType === 'application/pdf' || designerLayout.watermarkFileUrl.startsWith('data:application/pdf')) ? (
+                          <embed
+                            src={`${designerLayout.watermarkFileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                            type="application/pdf"
+                            style={{
+                              transform: `rotate(${designerLayout.watermarkRotation ?? 0}deg)`,
+                              opacity: designerLayout.watermarkOpacity ?? 0.15,
+                              width: '70%',
+                              height: '70%'
+                            }}
+                          />
+                        ) : null}
                       </div>
                     )}
 
@@ -5879,73 +6124,247 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                           )}
                         </div>
 
+                        {/* 1. Checkbox to Enable / Disable Watermark */}
+                        <div className="pt-1">
+                          <label className="flex items-center gap-2.5 p-2.5 bg-emerald-50/60 border border-emerald-200/80 rounded-xl cursor-pointer select-none hover:bg-emerald-50 transition-colors">
+                            <input
+                              type="checkbox"
+                              className="w-4 h-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer accent-emerald-600"
+                              checked={designerLayout.watermarkEnabled !== false}
+                              onChange={(e) => updateLayoutWithHistory({ ...designerLayout, watermarkEnabled: e.target.checked })}
+                            />
+                            <div className="flex flex-col flex-1">
+                              <span className="text-xs font-bold text-zinc-800">
+                                {language === 'ar' ? 'استخدام العلامة المائية في القالب' : 'Use Watermark in Template'}
+                              </span>
+                              <span className="text-[10px] text-zinc-500">
+                                {language === 'ar' ? 'تفعيل أو إيقاف ظهور العلامة المائية' : 'Enable or disable watermark display'}
+                              </span>
+                            </div>
+                          </label>
+                        </div>
+
+                        {/* 2. Watermark File Upload (Image or PDF) */}
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold text-zinc-500 block">
+                            {language === 'ar' ? 'العلامة المائية (صورة أو ملف PDF)' : 'Watermark (Image or PDF)'}
+                          </label>
+                          <input
+                            ref={watermarkFileInputRef}
+                            type="file"
+                            accept="image/*,application/pdf,.pdf"
+                            className="hidden"
+                            onChange={handleWatermarkUpload}
+                          />
+                          <button
+                            type="button"
+                            disabled={watermarkUploading}
+                            onClick={() => watermarkFileInputRef.current?.click()}
+                            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-zinc-50 hover:bg-emerald-50 text-zinc-700 hover:text-emerald-700 border border-dashed border-zinc-300 hover:border-emerald-400 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-60"
+                          >
+                            <Upload size={14} className="text-emerald-600" />
+                            <span>
+                              {watermarkUploading
+                                ? (language === 'ar' ? 'جاري معالجة الملف...' : 'Processing file...')
+                                : (language === 'ar' ? 'تحميل صورة أو ملف PDF' : 'Upload Image or PDF')}
+                            </span>
+                          </button>
+
+                          {/* 3. Saved Watermark Preview & Download Card */}
+                          {(designerLayout.watermarkFileUrl || designerLayout.watermarkImage) && (() => {
+                            const fileUrl = designerLayout.watermarkFileUrl || designerLayout.watermarkImage || '';
+                            const isPdfFile = designerLayout.watermarkFileType === 'application/pdf' || fileUrl.startsWith('data:application/pdf') || (designerLayout.watermarkFileName || '').toLowerCase().endsWith('.pdf');
+                            const displayFileName = designerLayout.watermarkFileName || (isPdfFile ? 'watermark.pdf' : 'watermark.png');
+                            return (
+                              <div className="p-2.5 bg-white border border-zinc-200 rounded-xl shadow-2xs space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 overflow-hidden border ${isPdfFile ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-emerald-50 border-emerald-200 text-emerald-600'}`}>
+                                    {!isPdfFile && designerLayout.watermarkImage ? (
+                                      <img
+                                        src={designerLayout.watermarkImage}
+                                        alt={displayFileName}
+                                        className="w-full h-full object-cover"
+                                        style={{ filter: designerLayout.watermarkColorMode === 'bw' ? 'grayscale(100%)' : 'none' }}
+                                      />
+                                    ) : (
+                                      <div className="flex flex-col items-center justify-center">
+                                        <FileText size={14} />
+                                        <span className="text-[7px] font-black">{isPdfFile ? 'PDF' : 'IMG'}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[11px] font-bold text-zinc-800 truncate" title={displayFileName}>
+                                      {displayFileName}
+                                    </p>
+                                    <span className={`inline-block px-1.5 py-0.2 rounded text-[8px] font-black uppercase ${isPdfFile ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                      {isPdfFile ? 'PDF Watermark' : 'Image Watermark'}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-zinc-100">
+                                  <button
+                                    type="button"
+                                    onClick={() => setPreviewWatermarkAttachment({
+                                      name: displayFileName,
+                                      url: fileUrl,
+                                      type: isPdfFile ? 'application/pdf' : (designerLayout.watermarkFileType || 'image/png'),
+                                      size: designerLayout.watermarkFileSize
+                                    })}
+                                    className="flex items-center justify-center gap-1 px-2 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+                                    title={language === 'ar' ? 'عرض ومعاينة العلامة المائية' : 'View / Preview Watermark'}
+                                  >
+                                    <Eye size={12} />
+                                    <span>{language === 'ar' ? 'عرض' : 'View'}</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={handleDownloadWatermark}
+                                    className="flex items-center justify-center gap-1 px-2 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+                                    title={language === 'ar' ? 'تحميل ملف العلامة المائية' : 'Download Watermark File'}
+                                  >
+                                    <Download size={12} />
+                                    <span>{language === 'ar' ? 'تحميل' : 'Download'}</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => updateLayoutWithHistory({
+                                      ...designerLayout,
+                                      watermarkImage: undefined,
+                                      watermarkOriginalImage: undefined,
+                                      watermarkFileUrl: undefined,
+                                      watermarkFileName: undefined,
+                                      watermarkFileType: undefined,
+                                      watermarkFileSize: undefined
+                                    })}
+                                    className="flex items-center justify-center gap-1 px-2 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+                                    title={language === 'ar' ? 'حذف ملف العلامة المائية' : 'Remove Watermark File'}
+                                  >
+                                    <Trash2 size={12} />
+                                    <span>{language === 'ar' ? 'حذف' : 'Remove'}</span>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+
                         {/* Watermark text */}
                         <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'العلامة المائية (نص)' : 'Watermark (Text)'}</label>
+                          <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'العلامة المائية (نص اختياري)' : 'Watermark (Optional Text)'}</label>
                           <input
                             type="text"
                             placeholder="CONFIDENTIAL"
                             className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs"
                             value={designerLayout.watermarkText || ''}
-                            onChange={(e) => updateLayoutWithHistory({ ...designerLayout, watermarkText: e.target.value })}
+                            onChange={(e) => updateLayoutWithHistory({ ...designerLayout, watermarkEnabled: true, watermarkText: e.target.value })}
                           />
                         </div>
 
-                        {/* Watermark image */}
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'العلامة المائية (صورة)' : 'Watermark (Image)'}</label>
+                        {/* 4. Clarity / Opacity Slider (1 to 100) */}
+                        <div className="space-y-1.5 pt-1">
+                          <div className="flex items-center justify-between text-[10px] font-bold text-zinc-600">
+                            <span>{language === 'ar' ? 'درجة الوضوح (1 - 100)' : 'Clarity / Opacity (1 - 100)'}</span>
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                min={1}
+                                max={100}
+                                value={Math.max(1, Math.min(100, Math.round((designerLayout.watermarkOpacity ?? 0.15) * 100)))}
+                                onChange={(e) => {
+                                  const val = Math.max(1, Math.min(100, parseInt(e.target.value) || 1));
+                                  updateLayoutWithHistory({ ...designerLayout, watermarkOpacity: val / 100 });
+                                }}
+                                className="w-12 px-1.5 py-0.5 bg-white border border-zinc-200 rounded text-center text-[10px] font-extrabold text-emerald-700"
+                              />
+                              <span className="text-emerald-700 font-extrabold">%</span>
+                            </div>
+                          </div>
                           <input
-                            type="file"
-                            accept="image/*"
-                            className="w-full text-xs"
-                            onChange={(e) => handleBgImageUpload(e, 'watermarkImage')}
+                            type="range"
+                            min="1"
+                            max="100"
+                            step="1"
+                            className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                            value={Math.max(1, Math.min(100, Math.round((designerLayout.watermarkOpacity ?? 0.15) * 100)))}
+                            onChange={(e) => {
+                              const val = Math.max(1, Math.min(100, parseInt(e.target.value) || 1));
+                              updateLayoutWithHistory({ ...designerLayout, watermarkOpacity: val / 100 });
+                            }}
                           />
-                          {designerLayout.watermarkImage && (
+                          <div className="flex justify-between text-[9px] text-zinc-400 font-mono px-0.5">
+                            <span>1</span>
+                            <span>25</span>
+                            <span>50</span>
+                            <span>75</span>
+                            <span>100</span>
+                          </div>
+                        </div>
+
+                        {/* 5. Black & White vs Color Mode Toggle */}
+                        <div className="space-y-1.5 pt-1">
+                          <label className="text-[10px] font-bold text-zinc-600 block">
+                            {language === 'ar' ? 'نمط لون العلامة المائية (أسود أم ألوان)' : 'Watermark Color Mode (B&W or Color)'}
+                          </label>
+                          <div className="grid grid-cols-2 gap-2">
                             <button
                               type="button"
-                              onClick={() => updateLayoutWithHistory({ ...designerLayout, watermarkImage: undefined })}
-                              className="text-[9px] text-red-500 font-bold hover:underline"
+                              onClick={() => handleWatermarkColorModeChange('color')}
+                              className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${
+                                (designerLayout.watermarkColorMode || 'color') === 'color'
+                                  ? 'bg-emerald-50 border-emerald-500 text-emerald-800 shadow-2xs'
+                                  : 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100'
+                              }`}
                             >
-                              {language === 'ar' ? 'حذف صورة العلامة' : 'Remove Watermark Image'}
+                              <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border ${
+                                (designerLayout.watermarkColorMode || 'color') === 'color'
+                                  ? 'bg-emerald-600 border-emerald-600 text-white'
+                                  : 'border-zinc-300 bg-white'
+                              }`}>
+                                {(designerLayout.watermarkColorMode || 'color') === 'color' && <Check size={10} />}
+                              </div>
+                              <span>{language === 'ar' ? 'ألوان' : 'Color'}</span>
                             </button>
-                          )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleWatermarkColorModeChange('bw')}
+                              className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${
+                                designerLayout.watermarkColorMode === 'bw'
+                                  ? 'bg-zinc-800 border-zinc-900 text-white shadow-2xs'
+                                  : 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100'
+                              }`}
+                            >
+                              <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border ${
+                                designerLayout.watermarkColorMode === 'bw'
+                                  ? 'bg-white border-white text-zinc-900'
+                                  : 'border-zinc-300 bg-white'
+                              }`}>
+                                {designerLayout.watermarkColorMode === 'bw' && <Check size={10} />}
+                              </div>
+                              <span>{language === 'ar' ? 'أسود وأبيض' : 'Black & White'}</span>
+                            </button>
+                          </div>
                         </div>
 
-                        {/* Watermark opacity */}
-                        {(designerLayout.watermarkText || designerLayout.watermarkImage) && (
-                          <>
-                            <div className="space-y-1">
-                              <div className="flex justify-between text-[10px] font-bold text-zinc-500">
-                                <span>{language === 'ar' ? 'شفافية العلامة' : 'Watermark Opacity'}</span>
-                                <span>{Math.round((designerLayout.watermarkOpacity ?? 0.15) * 100)}%</span>
-                              </div>
-                              <input
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.05"
-                                className="w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
-                                value={designerLayout.watermarkOpacity ?? 0.15}
-                                onChange={(e) => updateLayoutWithHistory({ ...designerLayout, watermarkOpacity: parseFloat(e.target.value) })}
-                              />
-                            </div>
-                            
-                            <div className="space-y-1">
-                              <div className="flex justify-between text-[10px] font-bold text-zinc-500">
-                                <span>{language === 'ar' ? 'زاوية العلامة' : 'Watermark Rotation'}</span>
-                                <span>{designerLayout.watermarkRotation ?? -45}°</span>
-                              </div>
-                              <input
-                                type="range"
-                                min="-180"
-                                max="180"
-                                className="w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
-                                value={designerLayout.watermarkRotation ?? -45}
-                                onChange={(e) => updateLayoutWithHistory({ ...designerLayout, watermarkRotation: parseInt(e.target.value) })}
-                              />
-                            </div>
-                          </>
-                        )}
+                        {/* Watermark Rotation */}
+                        <div className="space-y-1 pt-1">
+                          <div className="flex justify-between text-[10px] font-bold text-zinc-500">
+                            <span>{language === 'ar' ? 'زاوية دوران العلامة' : 'Watermark Rotation'}</span>
+                            <span>{designerLayout.watermarkRotation ?? -45}°</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="-180"
+                            max="180"
+                            className="w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                            value={designerLayout.watermarkRotation ?? -45}
+                            onChange={(e) => updateLayoutWithHistory({ ...designerLayout, watermarkRotation: parseInt(e.target.value) })}
+                          />
+                        </div>
                       </div>
 
                       {/* Target Document type */}
@@ -6405,6 +6824,16 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Watermark File Preview Modal */}
+      {previewWatermarkAttachment && (
+        <AttachmentPreviewModal
+          isOpen={Boolean(previewWatermarkAttachment)}
+          onClose={() => setPreviewWatermarkAttachment(null)}
+          attachment={previewWatermarkAttachment}
+          title={previewWatermarkAttachment.name || (language === 'ar' ? 'معاينة العلامة المائية' : 'Watermark Preview')}
+        />
+      )}
     </div>
   );
 }
