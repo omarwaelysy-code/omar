@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Plus, Trash2, X, History, ChevronRight, ChevronLeft, 
   Wallet, Layers, MapPin, Camera, FileUp, Smartphone, Globe, User, Calendar, AlertCircle,
-  LayoutGrid, List
+  LayoutGrid, List, Copy, Printer, FileText, FileSpreadsheet
 } from 'lucide-react';
+import { ExportButtons } from '../components/ExportButtons';
+import { exportToExcel } from '../utils/excelUtils';
 import { motion, AnimatePresence } from 'motion/react';
 import SignatureCanvas from 'react-signature-canvas';
 import QRCode from 'react-qr-code';
@@ -185,6 +187,78 @@ export const Operations: React.FC = () => {
       operation_number: ''
     });
   };
+
+  const handleCopyOperation = async (op: Operation) => {
+    try {
+      const values = await apiRequest<any[]>(`/operations/${op.id}/values`).catch(() => []);
+      const extraFormData: any = {};
+      (values || []).forEach(v => { extraFormData[v.field_id] = v.value; });
+      setEditingOperation(null);
+      setSelectedCategory(op.category_id);
+      setFormData({
+        ...op,
+        ...extraFormData,
+        id: undefined,
+        operation_number: '',
+        date: new Date().toISOString().split('T')[0],
+        operation_date: new Date().toISOString().split('T')[0],
+        status: 'pending'
+      });
+      setIsModalOpen(true);
+      showNotification(language === 'ar' ? 'تم نسخ بيانات العملية بنجاح' : 'Operation copied successfully', 'success');
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handlePrintOperation = (op: any) => {
+    const catName = categories.find(c => c.id === op.category_id)?.name || 'عملية تشغيلية';
+    const custName = op.customer_name || customers.find(c => c.id === op.customer_id)?.name || '-';
+    window.dispatchEvent(new CustomEvent('erp-print-document', {
+      detail: {
+        operationType: 'flexible_operation',
+        documentId: op.id || '',
+        documentData: {
+          ...op,
+          doc_number: op.operation_number || op.id?.slice(0, 8) || 'OP-DRAFT',
+          date: op.operation_date || op.date,
+          customer_name: custName,
+          category_name: catName,
+          notes: op.description || '-'
+        }
+      }
+    }));
+  };
+
+  const handleExportSingleOpExcel = (op: any) => {
+    const catName = categories.find(c => c.id === op.category_id)?.name || 'عملية تشغيلية';
+    const custName = op.customer_name || customers.find(c => c.id === op.customer_id)?.name || '-';
+    const cols = [
+      { header: language === 'ar' ? 'رقم العملية' : 'Operation #', key: 'operation_number' },
+      { header: language === 'ar' ? 'العميل' : 'Customer', key: 'customer_name' },
+      { header: language === 'ar' ? 'التصنيف' : 'Category', key: 'category_name' },
+      { header: language === 'ar' ? 'التاريخ' : 'Date', key: 'date' },
+      { header: language === 'ar' ? 'الحالة' : 'Status', key: 'status' },
+      { header: language === 'ar' ? 'الوصف' : 'Description', key: 'description' }
+    ];
+    exportToExcel([{
+      operation_number: op.operation_number || op.id?.slice(0, 8) || 'OP-DRAFT',
+      customer_name: custName,
+      category_name: catName,
+      date: String(op.operation_date || op.date || '').slice(0, 10),
+      status: op.status || 'pending',
+      description: op.description || '-'
+    }], cols, `Operation_${op.operation_number || 'Draft'}`);
+  };
+
+  const exportListColumns = [
+    { header: language === 'ar' ? 'كود العملية' : 'Operation #', key: 'operation_number' },
+    { header: language === 'ar' ? 'العميل' : 'Customer', key: 'customer_name' },
+    { header: language === 'ar' ? 'التصنيف' : 'Category', key: 'category_name' },
+    { header: language === 'ar' ? 'الحالة' : 'Status', key: 'status' },
+    { header: language === 'ar' ? 'التاريخ' : 'Date', key: 'operation_date' },
+    { header: language === 'ar' ? 'الوصف' : 'Description', key: 'description' }
+  ];
 
   const renderDynamicField = (field: OperationField) => {
     const rawValue = formData[field.id] || formData[field.name];
@@ -371,7 +445,20 @@ export const Operations: React.FC = () => {
                   إدارة المشروعات والعمليات التشغيلية الذكية
                 </p>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <ExportButtons
+                  data={operations.map(op => ({
+                    ...op,
+                    operation_number: op.operation_number || op.id.slice(0, 8).toUpperCase(),
+                    customer_name: op.customer_name || 'Individual Client',
+                    category_name: categories.find(c => c.id === op.category_id)?.name || 'General Operation',
+                    operation_date: String(op.operation_date || op.date || '').slice(0, 10)
+                  }))}
+                  columns={exportListColumns}
+                  fileName="Flexible_Operations"
+                  title={language === 'ar' ? 'سجل العمليات المرنة' : 'Flexible Operations Register'}
+                  operationType="flexible_operation"
+                />
                 <button onClick={() => setIsActivityLogOpen(true)} className="w-14 h-14 bg-white text-slate-400 border border-slate-100 rounded-2xl flex items-center justify-center shadow-sm hover:text-indigo-600 hover:border-indigo-100 transition-all active:scale-95">
                   <History size={24} />
                 </button>
@@ -482,7 +569,28 @@ export const Operations: React.FC = () => {
                               {new Date(op.operation_date || op.date).toLocaleDateString()}
                             </td>
                             <td className="px-6 py-4 text-left">
-                              <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleCopyOperation(op); }}
+                                  className="p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-xl transition-all"
+                                  title={language === 'ar' ? 'نسخ العملية' : 'Copy Operation'}
+                                >
+                                  <Copy size={16} />
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handlePrintOperation(op); }}
+                                  className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-all"
+                                  title={language === 'ar' ? 'طباعة / PDF' : 'Print / PDF'}
+                                >
+                                  <Printer size={16} />
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleExportSingleOpExcel(op); }}
+                                  className="p-2 text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded-xl transition-all"
+                                  title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+                                >
+                                  <FileSpreadsheet size={16} />
+                                </button>
                                 <button
                                   onClick={async (e) => {
                                     e.stopPropagation();
@@ -595,7 +703,43 @@ export const Operations: React.FC = () => {
                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em] leading-none">{editingOperation?.operation_number || 'SYSTEM FLOW : NEW'}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingOperation(null);
+                        setFormData((prev: any) => ({ ...prev, id: undefined, operation_number: '' }));
+                        showNotification(language === 'ar' ? 'تم نسخ العملية كعملية جديدة' : 'Copied as new operation', 'success');
+                      }}
+                      className="px-4 py-3 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-2xl font-bold text-xs hover:bg-indigo-100 transition-all flex items-center gap-1.5"
+                    >
+                      <Copy size={16} />
+                      <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handlePrintOperation(formData)}
+                      className="px-4 py-3 bg-slate-50 text-slate-700 border border-slate-200 rounded-2xl font-bold text-xs hover:bg-slate-100 transition-all flex items-center gap-1.5"
+                    >
+                      <Printer size={16} className="text-emerald-600" />
+                      <span>{language === 'ar' ? 'طابعة' : 'Print'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handlePrintOperation(formData)}
+                      className="px-4 py-3 bg-rose-50 text-rose-700 border border-rose-200 rounded-2xl font-bold text-xs hover:bg-rose-100 transition-all flex items-center gap-1.5"
+                    >
+                      <FileText size={16} />
+                      <span>{language === 'ar' ? 'تصدير PDF' : 'PDF'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleExportSingleOpExcel(formData)}
+                      className="px-4 py-3 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-2xl font-bold text-xs hover:bg-emerald-100 transition-all flex items-center gap-1.5"
+                    >
+                      <FileSpreadsheet size={16} />
+                      <span>{language === 'ar' ? 'تصدير Excel' : 'Excel'}</span>
+                    </button>
                     <button type="submit" form="op-form" className="px-10 py-5 bg-zinc-900 text-white rounded-[1.5rem] font-black hover:bg-zinc-800 transition-all active:scale-95 shadow-xl">
                        {editingOperation ? t('common.save') : t('common.add')}
                     </button>

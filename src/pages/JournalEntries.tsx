@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
 import { JournalEntry, Account } from '../types';
-import { Search, Calendar, FileText, Eye, Download, Printer, Filter, ArrowLeftRight, Trash2, RotateCcw, ChevronLeft, ChevronRight, ChevronDown, FileSpreadsheet } from 'lucide-react';
+import { Search, Calendar, FileText, Eye, Download, Printer, Filter, ArrowLeftRight, Trash2, RotateCcw, ChevronLeft, ChevronRight, ChevronDown, FileSpreadsheet, Copy } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { exportToPDF } from '../utils/pdfUtils';
@@ -332,6 +332,66 @@ export const JournalEntries: React.FC = () => {
     setIsDeleteModalOpen(true);
   };
 
+  const handleCopyEntryToCreate = async (entry: JournalEntry) => {
+    try {
+      let items = entry.items || [];
+      if (items.length === 0) {
+        items = await dbService.query<any>('journal_entry_lines', [
+          { field: 'journal_entry_id', operator: '==', value: entry.id }
+        ]);
+      }
+      const mapped = items.map((line: any) => ({
+        account_id: line.account_id || '',
+        account_name: line.account_name || accounts.find(a => a.id === line.account_id)?.name || '',
+        debit: Number(line.debit) || 0,
+        credit: Number(line.credit) || 0,
+        description: line.description || entry.description || '',
+        sub_account_id: line.sub_account_id || line.customer_id || line.supplier_id || '',
+        sub_account_type: line.sub_account_type || (line.customer_id ? 'customer' : line.supplier_id ? 'supplier' : undefined),
+        customer_id: line.customer_id || '',
+        supplier_id: line.supplier_id || '',
+        operation_id: line.operation_id || '',
+        department_id: line.department_id || '',
+        cost_center_id: line.cost_center_id || '',
+        currency: line.currency || 'local',
+        exchange_rate: Number(line.exchange_rate) || 1,
+        foreign_amount: Number(line.foreign_amount) || 0
+      }));
+      sessionStorage.setItem('erp_copied_journal_entry', JSON.stringify({
+        description: entry.description || '',
+        reference_number: entry.reference_number || '',
+        items: mapped
+      }));
+      setSelectedEntry(null);
+      setCurrentPage('create_journal_entry');
+    } catch (e) {
+      console.error(e);
+      showNotification(language === 'ar' ? 'تعذر نسخ القيد' : 'Failed to copy entry', 'error');
+    }
+  };
+
+  const handleExportSingleEntryExcel = async (entry: JournalEntry) => {
+    let items = entry.items || [];
+    if (items.length === 0) {
+      items = await dbService.query<any>('journal_entry_lines', [
+        { field: 'journal_entry_id', operator: '==', value: entry.id }
+      ]);
+    }
+    const data = items.map((line: any) => {
+      const acc = accounts.find(a => a.id === line.account_id);
+      return {
+        [language === 'ar' ? 'رقم القيد' : 'Entry #']: entry.entry_number || '-',
+        [language === 'ar' ? 'التاريخ' : 'Date']: formatDate(entry.date),
+        [language === 'ar' ? 'كود الحساب' : 'Account Code']: acc?.code || '-',
+        [language === 'ar' ? 'اسم الحساب' : 'Account Name']: line.account_name || acc?.name || '-',
+        [language === 'ar' ? 'مدين' : 'Debit']: Number(line.debit) || 0,
+        [language === 'ar' ? 'دائن' : 'Credit']: Number(line.credit) || 0,
+        [language === 'ar' ? 'البيان' : 'Description']: line.description || entry.description || '-'
+      };
+    });
+    exportToExcel(data, { filename: `Journal_Entry_${entry.entry_number || entry.id}`, sheetName: 'Journal Entry' });
+  };
+
   const confirmDelete = async () => {
     if (!entryToDelete || !user) return;
     const entry = entries.find(e => e.id === entryToDelete);
@@ -376,8 +436,30 @@ export const JournalEntries: React.FC = () => {
             <FileSpreadsheet size={16} />
             <span>{language === 'ar' ? 'استيراد Excel' : 'Import Excel'}</span>
           </button>
-          <button onClick={handleExportPDF} className="p-2.5 bg-white border border-zinc-200 text-zinc-600 rounded-xl hover:bg-zinc-50 transition-all shadow-sm"><Printer size={20} /></button>
-          <button onClick={handleExportExcel} className="p-2.5 bg-white border border-zinc-200 text-zinc-600 rounded-xl hover:bg-zinc-50 transition-all shadow-sm"><Download size={20} /></button>
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-zinc-200 text-zinc-700 rounded-xl hover:bg-zinc-50 transition-all shadow-sm font-bold text-xs"
+            title={language === 'ar' ? 'طباعة' : 'Print'}
+          >
+            <Printer size={16} className="text-emerald-600" />
+            <span>{language === 'ar' ? 'طابعة' : 'Print'}</span>
+          </button>
+          <button
+            onClick={handleExportPDF}
+            className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl hover:bg-rose-100 transition-all shadow-sm font-bold text-xs"
+            title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
+          >
+            <FileText size={16} />
+            <span>{language === 'ar' ? 'تصدير PDF' : 'Export PDF'}</span>
+          </button>
+          <button
+            onClick={handleExportExcel}
+            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl hover:bg-emerald-100 transition-all shadow-sm font-bold text-xs"
+            title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+          >
+            <Download size={16} />
+            <span>{language === 'ar' ? 'تصدير Excel' : 'Export Excel'}</span>
+          </button>
         </div>
       </div>
 
@@ -766,20 +848,41 @@ export const JournalEntries: React.FC = () => {
                   <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{formatMoney(entry.total_debit)}</td>
                   <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{formatMoney(entry.total_credit)}</td>
                   <td className="px-6 py-4 text-center">
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex items-center justify-center gap-1.5">
                       <button 
                         onClick={() => setSelectedEntry(entry)}
-                        className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                        className="p-1.5 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
                         title={language === 'ar' ? 'عرض' : 'View'}
                       >
-                        <Eye size={18} />
+                        <Eye size={16} />
+                      </button>
+                      <button 
+                        onClick={() => handleCopyEntryToCreate(entry)}
+                        className="p-1.5 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-xl transition-all"
+                        title={language === 'ar' ? 'نسخ القيد' : 'Copy Entry'}
+                      >
+                        <Copy size={16} />
+                      </button>
+                      <button 
+                        onClick={() => printDocument('journal_entries', entry.id)}
+                        className="p-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-all"
+                        title={language === 'ar' ? 'طباعة / PDF' : 'Print / PDF'}
+                      >
+                        <Printer size={16} />
+                      </button>
+                      <button 
+                        onClick={() => handleExportSingleEntryExcel(entry)}
+                        className="p-1.5 text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded-xl transition-all"
+                        title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+                      >
+                        <FileSpreadsheet size={16} />
                       </button>
                       <button 
                         onClick={() => handleDelete(entry.id)}
-                        className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                        className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
                         title={language === 'ar' ? 'حذف' : 'Delete'}
                       >
-                        <Trash2 size={18} />
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   </td>
@@ -912,24 +1015,45 @@ export const JournalEntries: React.FC = () => {
                 </div>
               </div>
 
-              <div className={`p-6 bg-zinc-50 border-t border-zinc-100 flex justify-end gap-3 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                <button 
-                  onClick={() => setSelectedEntry(null)}
-                  className="px-6 py-2.5 bg-zinc-200 text-zinc-600 rounded-xl font-bold hover:bg-zinc-300 transition-all"
-                >
-                  {language === 'ar' ? 'إغلاق' : 'Close'}
-                </button>
-                <button 
-                  onClick={() => {
-                    if (selectedEntry) {
-                      printDocument('journal_entries', selectedEntry.id);
-                    }
-                  }}
-                  className={`px-6 py-2.5 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}
-                >
-                  <Printer size={18} />
-                  {t('journal.print')}
-                </button>
+              <div className={`p-6 bg-zinc-50 border-t border-zinc-100 flex flex-wrap justify-between items-center gap-3 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => selectedEntry && handleCopyEntryToCreate(selectedEntry)}
+                    className="px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl font-bold text-xs hover:bg-indigo-100 transition-all flex items-center gap-1.5"
+                  >
+                    <Copy size={16} />
+                    <span>{language === 'ar' ? 'نسخ القيد' : 'Copy Entry'}</span>
+                  </button>
+                  <button
+                    onClick={() => selectedEntry && printDocument('journal_entries', selectedEntry.id)}
+                    className="px-4 py-2 bg-white text-zinc-700 border border-zinc-200 rounded-xl font-bold text-xs hover:bg-zinc-100 transition-all flex items-center gap-1.5"
+                  >
+                    <Printer size={16} className="text-emerald-600" />
+                    <span>{language === 'ar' ? 'طابعة' : 'Print'}</span>
+                  </button>
+                  <button
+                    onClick={() => selectedEntry && printDocument('journal_entries', selectedEntry.id)}
+                    className="px-4 py-2 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl font-bold text-xs hover:bg-rose-100 transition-all flex items-center gap-1.5"
+                  >
+                    <FileText size={16} />
+                    <span>{language === 'ar' ? 'تصدير PDF' : 'Export PDF'}</span>
+                  </button>
+                  <button
+                    onClick={() => selectedEntry && handleExportSingleEntryExcel(selectedEntry)}
+                    className="px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl font-bold text-xs hover:bg-emerald-100 transition-all flex items-center gap-1.5"
+                  >
+                    <FileSpreadsheet size={16} />
+                    <span>{language === 'ar' ? 'تصدير Excel' : 'Export Excel'}</span>
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setSelectedEntry(null)}
+                    className="px-6 py-2.5 bg-zinc-200 text-zinc-600 rounded-xl font-bold hover:bg-zinc-300 transition-all"
+                  >
+                    {language === 'ar' ? 'إغلاق' : 'Close'}
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>

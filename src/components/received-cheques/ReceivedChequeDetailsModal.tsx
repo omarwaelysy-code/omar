@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   X, Calendar, Building2, User, FileText, CheckCircle2, Clock, 
   RotateCcw, Ban, Paperclip, Printer, ExternalLink, ArrowDownLeft,
-  Eye, Download
+  Eye, Download, Copy, FileSpreadsheet
 } from 'lucide-react';
 import { ReceivedCheque } from '../../types';
 import { tafqeetAr, tafqeetEn } from '../../utils/tafqeet';
@@ -18,6 +18,9 @@ interface ReceivedChequeDetailsModalProps {
   onPostpone?: (cheque: ReceivedCheque) => void;
   onReturn?: (cheque: ReceivedCheque) => void;
   onCancel?: (cheque: ReceivedCheque) => void;
+  onPrint?: (cheque: ReceivedCheque) => void;
+  onCopy?: (cheque: ReceivedCheque) => void;
+  onExportExcel?: (cheque: ReceivedCheque) => void;
 }
 
 export const ReceivedChequeDetailsModal: React.FC<ReceivedChequeDetailsModalProps> = ({
@@ -27,7 +30,10 @@ export const ReceivedChequeDetailsModal: React.FC<ReceivedChequeDetailsModalProp
   onCollect,
   onPostpone,
   onReturn,
-  onCancel
+  onCancel,
+  onPrint,
+  onCopy,
+  onExportExcel
 }) => {
   const { language, dir } = useLanguage();
   const isAr = language === 'ar';
@@ -424,7 +430,50 @@ export const ReceivedChequeDetailsModal: React.FC<ReceivedChequeDetailsModalProp
         </div>
 
         {/* Modal Footer */}
-        <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-end gap-2">
+        <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {onCopy && (
+              <button
+                type="button"
+                onClick={() => onCopy(cheque)}
+                className="px-2.5 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-bold hover:bg-indigo-100 flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                {isAr ? 'نسخ' : 'Copy'}
+              </button>
+            )}
+            {onPrint && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onPrint(cheque)}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5 text-blue-600" />
+                  {isAr ? 'طابعة' : 'Print'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onPrint(cheque)}
+                  className="px-2.5 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-bold hover:bg-rose-100 flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  {isAr ? 'تصدير PDF' : 'Export PDF'}
+                </button>
+              </>
+            )}
+            {onExportExcel && (
+              <button
+                type="button"
+                onClick={() => onExportExcel(cheque)}
+                className="px-2.5 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-bold hover:bg-emerald-100 flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                {isAr ? 'تصدير Excel' : 'Export Excel'}
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
           {['RECEIVED', 'UNDER_COLLECTION', 'POSTPONED'].includes(cheque.status) && (
             <>
               {onCollect && (
@@ -478,6 +527,7 @@ export const ReceivedChequeDetailsModal: React.FC<ReceivedChequeDetailsModalProp
           >
             {isAr ? 'إغلاق' : 'Close'}
           </button>
+          </div>
         </div>
 
       </div>

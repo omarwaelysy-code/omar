@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { Supplier, Account, JournalEntry, JournalEntryItem, ActivityLog, Currency } from '../types';
-import { Search, Plus, Trash2, X, Tag, Truck, Calendar, Save, Wallet, History, BookOpen, ChevronRight, ChevronLeft, RotateCcw, ChevronDown, LayoutGrid, List, Hash, Copy, Check, Coins, RefreshCw, FileSpreadsheet } from 'lucide-react';
+import { Search, Plus, Trash2, X, Tag, Truck, Calendar, Save, Wallet, History, BookOpen, ChevronRight, ChevronLeft, RotateCcw, ChevronDown, LayoutGrid, List, Hash, Copy, Check, Coins, RefreshCw, FileSpreadsheet, Printer, Download, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService, apiRequest } from '../services/dbService';
@@ -371,6 +371,95 @@ export const SupplierDiscounts: React.FC = () => {
     });
     setAttachments(Array.isArray(discount.attachments) ? discount.attachments : []);
     setIsModalOpen(true);
+  };
+
+  const handleCopyDiscount = (discount?: any) => {
+    const src = discount || editingDiscount || {
+      ...discountData,
+      supplier_name: suppliers.find(s => s.id === discountData.supplier_id)?.name || '',
+      account_name: accounts.find(a => a.id === discountData.account_id)?.name || ''
+    };
+    if (!src) return;
+    const today = new Date().toISOString().slice(0, 10);
+    setEditingDiscount(null);
+    let accId = src.account_id || settings?.supplier_discount_account_id || '';
+    const isDiscountAcc = accounts.some(a => a.id === accId && (a.account_usage === 'earned_discounts' || a.account_usage === 'purchase_discount' || a.name?.includes('خصم')));
+    if (accId) {
+      if (isDiscountAcc) {
+        setAccountSource('discount');
+        setDiscountAccountId(accId);
+        setCustomAccountId('');
+      } else {
+        setAccountSource('custom');
+        setCustomAccountId(accId);
+      }
+    }
+    setDiscountData({
+      supplier_id: src.supplier_id || '',
+      amount: Math.abs(Number(src.amount || 0)),
+      currency_amount: Math.abs(Number(src.currency_amount ?? src.amount ?? 0)),
+      currency_id: src.currency_id || '',
+      currency: src.currency || baseCurrencyCode,
+      exchange_rate: Number(src.exchange_rate || 1),
+      date: today,
+      account_id: accId,
+      notes: src.notes || src.description || ''
+    });
+    setAttachments([]);
+    generateDiscountNumber(today).then(setDiscountNumber);
+    setIsModalOpen(true);
+    showNotification(language === 'ar' ? 'تم نسخ بيانات الإشعار كمسودة جديدة' : 'Discount copied as new draft', 'success');
+  };
+
+  const handlePrintSingleDiscount = (discount?: any) => {
+    const src = discount || editingDiscount || {
+      ...discountData,
+      number: discountNumber,
+      supplier_name: suppliers.find(s => s.id === discountData.supplier_id)?.name || '',
+      account_name: accounts.find(a => a.id === discountData.account_id)?.name || ''
+    };
+    if (!src) return;
+    window.dispatchEvent(new CustomEvent('erp-print-document', {
+      detail: {
+        operationType: 'supplier_discount',
+        documentId: src.id || 'draft',
+        documentData: {
+          ...src,
+          invoice_number: src.number || discountNumber,
+          supplier_name: src.supplier_name || suppliers.find(s => s.id === src.supplier_id)?.name || '-',
+          account_name: src.account_name || accounts.find(a => a.id === src.account_id)?.name || '-',
+          total_amount: Math.abs(Number(src.amount || 0)),
+          items: [{
+            account_name: src.account_name || accounts.find(a => a.id === src.account_id)?.name || 'خصم مكتسب',
+            description: src.notes || src.description || 'إشعار خصم مورد',
+            currency: src.currency || baseCurrencyCode,
+            exchange_rate: src.exchange_rate || 1,
+            amount: Math.abs(Number(src.amount || 0))
+          }]
+        }
+      }
+    }));
+  };
+
+  const handleExportSingleExcel = (discount?: any) => {
+    const src = discount || editingDiscount || {
+      ...discountData,
+      number: discountNumber,
+      supplier_name: suppliers.find(s => s.id === discountData.supplier_id)?.name || '',
+      account_name: accounts.find(a => a.id === discountData.account_id)?.name || ''
+    };
+    if (!src) return;
+    exportToExcel([{
+      'رقم المستند': src.number || discountNumber || '-',
+      'المورد': src.supplier_name || suppliers.find(s => s.id === src.supplier_id)?.name || '-',
+      'الحساب': src.account_name || accounts.find(a => a.id === src.account_id)?.name || '-',
+      'التاريخ': formatDate(src.date),
+      'المبلغ بالعملة': src.currency_amount ?? src.amount ?? 0,
+      'العملة': src.currency || baseCurrencyCode,
+      'سعر الصرف': src.exchange_rate || 1,
+      'المبلغ المحلي': src.amount || 0,
+      'البيان': src.notes || src.description || '-'
+    }], { filename: `Supplier_Discount_${src.number || discountNumber || 'draft'}`, sheetName: 'إشعار خصم مورد' });
   };
 
   const handlePrevDiscount = () => {
@@ -1073,6 +1162,22 @@ export const SupplierDiscounts: React.FC = () => {
                             <Tag size={15} />
                           </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => handleCopyDiscount(discount)}
+                          className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                          title={language === 'ar' ? 'نسخ كإشعار جديد' : 'Copy'}
+                        >
+                          <Copy size={15} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handlePrintSingleDiscount(discount)}
+                          className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                          title={language === 'ar' ? 'طباعة / تصدير PDF' : 'Print / PDF'}
+                        >
+                          <Printer size={15} />
+                        </button>
                         <button 
                           onClick={() => {
                             setActivityLogDocumentId(discount.id);
@@ -1179,6 +1284,22 @@ export const SupplierDiscounts: React.FC = () => {
                     >
                       <Tag size={14} />
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyDiscount(discount)}
+                      className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"
+                      title={language === 'ar' ? 'نسخ كإشعار جديد' : 'Copy'}
+                    >
+                      <Copy size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handlePrintSingleDiscount(discount)}
+                      className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                      title={language === 'ar' ? 'طباعة / تصدير PDF' : 'Print / PDF'}
+                    >
+                      <Printer size={14} />
+                    </button>
                     <button 
                       onClick={() => {
                         setActivityLogDocumentId(discount.id);
@@ -1242,6 +1363,42 @@ export const SupplierDiscounts: React.FC = () => {
                 >
                   <History size={13} />
                   <span>قيد اليومية \ سجل التعديلات</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCopyDiscount()}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all"
+                  title={language === 'ar' ? 'نسخ كإشعار جديد' : 'Copy as new'}
+                >
+                  <Copy size={13} />
+                  <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePrintSingleDiscount()}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all"
+                  title={language === 'ar' ? 'طباعة الإشعار' : 'Print'}
+                >
+                  <Printer size={13} />
+                  <span>{language === 'ar' ? 'طابعة' : 'Print'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePrintSingleDiscount()}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all"
+                  title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
+                >
+                  <FileText size={13} />
+                  <span>PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExportSingleExcel()}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition-all"
+                  title={language === 'ar' ? 'تصدير إكسيل' : 'Export Excel'}
+                >
+                  <Download size={13} />
+                  <span>Excel</span>
                 </button>
               </div>
 

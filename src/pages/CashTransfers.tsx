@@ -9,7 +9,7 @@ import {
   Download, Eye, FileText, History, Printer, 
   Wallet, Calendar, Hash, Layers, Save,
   Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, User, ChevronDown, LayoutGrid, List,
-  Coins, DollarSign, FileSpreadsheet
+  Coins, DollarSign, FileSpreadsheet, Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
@@ -957,7 +957,95 @@ export const CashTransfers: React.FC = () => {
   }, [selectedTransferIds, filteredTransfers, paymentMethods, accounts, companyCurrencies, companyData]);
 
   const exportToPDF = async (transfer: CashTransfer) => {
-    // Logic for single transfer PDF if needed
+    handlePrintSingleTransfer(transfer);
+  };
+
+  const handleCopyTransfer = async (transfer?: CashTransfer) => {
+    const src = transfer || editingTransfer || viewTransfer || {
+      ...formData,
+      from_payment_method_name: paymentMethods.find(p => p.id === formData.from_payment_method_id)?.name || '',
+      to_payment_method_name: paymentMethods.find(p => p.id === formData.to_payment_method_id)?.name || ''
+    } as any;
+    if (!src) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const nextSeq = await generateTransferNumber(today);
+    setEditingTransfer(null);
+    setViewTransfer(null);
+    setShowSidePanel(false);
+    setAttachments([]);
+    const fromCurr = getEffectiveFromCurrency(src);
+    const toCurr = getEffectiveToCurrency(src);
+    const rate = Number(src.exchange_rate) || 1;
+    const amt = Math.abs(Number(src.amount || 0));
+    const converted = Math.abs(Number(src.converted_amount || amt));
+    setFormData({
+      date: today,
+      amount: amt,
+      from_payment_method_id: src.from_payment_method_id || '',
+      to_payment_method_id: src.to_payment_method_id || '',
+      description: src.description || '',
+      transfer_number: nextSeq,
+      from_currency: fromCurr,
+      to_currency: toCurr,
+      exchange_rate: rate,
+      converted_amount: converted
+    });
+    setIsModalOpen(true);
+    showNotification(language === 'ar' ? 'تم نسخ بيانات التحويل كمسودة جديدة' : 'Transfer copied as new draft', 'success');
+  };
+
+  const handlePrintSingleTransfer = (transfer?: CashTransfer) => {
+    const src = transfer || editingTransfer || viewTransfer || {
+      ...formData,
+      from_payment_method_name: paymentMethods.find(p => p.id === formData.from_payment_method_id)?.name || '',
+      to_payment_method_name: paymentMethods.find(p => p.id === formData.to_payment_method_id)?.name || ''
+    } as any;
+    if (!src) return;
+    const fromPM = paymentMethods.find(pm => pm.id === src.from_payment_method_id);
+    const toPM = paymentMethods.find(pm => pm.id === src.to_payment_method_id);
+    const fromName = src.from_payment_method_name || fromPM?.name || '-';
+    const toName = src.to_payment_method_name || toPM?.name || '-';
+    const amt = Math.abs(Number(src.amount || 0));
+    window.dispatchEvent(new CustomEvent('erp-print-document', {
+      detail: {
+        operationType: 'cash_transfer',
+        documentId: src.id || 'draft',
+        documentData: {
+          ...src,
+          invoice_number: src.transfer_number || formData.transfer_number || '-',
+          number: src.transfer_number || formData.transfer_number || '-',
+          total_amount: amt,
+          items: [{
+            from_account: `${fromName} (${src.from_currency || 'EGP'})`,
+            to_account: `${toName} (${src.to_currency || 'EGP'})`,
+            description: src.description || 'تحويل نقدي بين الخزائن والبنوك',
+            currency: src.from_currency || 'EGP',
+            amount: amt
+          }]
+        }
+      }
+    }));
+  };
+
+  const handleExportSingleExcel = (transfer?: CashTransfer) => {
+    const src = transfer || editingTransfer || viewTransfer || {
+      ...formData,
+      from_payment_method_name: paymentMethods.find(p => p.id === formData.from_payment_method_id)?.name || '',
+      to_payment_method_name: paymentMethods.find(p => p.id === formData.to_payment_method_id)?.name || ''
+    } as any;
+    if (!src) return;
+    exportToExcel([{
+      'رقم التحويل': src.transfer_number || '-',
+      'التاريخ': formatDate(src.date),
+      'من بنك / خزينة': src.from_payment_method_name || '-',
+      'عملة المصدر': src.from_currency || 'EGP',
+      'المبلغ المصدر': src.amount || 0,
+      'إلى بنك / خزينة': src.to_payment_method_name || '-',
+      'عملة الوجهة': src.to_currency || 'EGP',
+      'المبلغ المودع': src.converted_amount || src.amount || 0,
+      'سعر الصرف': src.exchange_rate || 1,
+      'البيان': src.description || '-'
+    }], { filename: `Cash_Transfer_${src.transfer_number || 'draft'}`, sheetName: 'تحويل نقدي' });
   };
 
   const handleExportExcel = () => {
@@ -1531,6 +1619,28 @@ export const CashTransfers: React.FC = () => {
                               <Pencil size={15} />
                             </button>
                           )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCopyTransfer(transfer);
+                            }}
+                            className="p-1.5 text-zinc-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                            title={language === 'ar' ? 'نسخ كتحويل جديد' : 'Copy'}
+                          >
+                            <Copy size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePrintSingleTransfer(transfer);
+                            }}
+                            className="p-1.5 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                            title={language === 'ar' ? 'طباعة / PDF' : 'Print / PDF'}
+                          >
+                            <Printer size={15} />
+                          </button>
                           {!transfer.is_reversed && !transfer.is_reversal_doc && (
                             <button 
                               onClick={(e) => {
@@ -1696,6 +1806,42 @@ export const CashTransfers: React.FC = () => {
                 >
                   <History size={16} />
                   <span>{language === 'ar' ? 'قيد اليومية' : 'Journal Entry'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCopyTransfer()}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all"
+                  title={language === 'ar' ? 'نسخ كتحويل جديد' : 'Copy'}
+                >
+                  <Copy size={14} />
+                  <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePrintSingleTransfer()}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200 rounded-xl text-xs font-bold transition-all"
+                  title={language === 'ar' ? 'طباعة' : 'Print'}
+                >
+                  <Printer size={14} />
+                  <span>{language === 'ar' ? 'طابعة' : 'Print'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePrintSingleTransfer()}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all"
+                  title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
+                >
+                  <FileText size={14} />
+                  <span>PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExportSingleExcel()}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition-all"
+                  title={language === 'ar' ? 'تصدير إكسيل' : 'Export Excel'}
+                >
+                  <Download size={14} />
+                  <span>Excel</span>
                 </button>
 
                 {/* Top Action Buttons (انقل الزراير إلى أعلى) */}
@@ -2327,8 +2473,40 @@ export const CashTransfers: React.FC = () => {
               className="w-full max-w-lg bg-white h-full shadow-2xl flex flex-col"
             >
               <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <h3 className="text-xl font-bold text-zinc-900">{language === 'ar' ? 'تفاصيل التحويل بين البنوك والخزائن' : 'Transfer Details'}</h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-lg font-bold text-zinc-900">{language === 'ar' ? 'تفاصيل التحويل' : 'Transfer Details'}</h3>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyTransfer(viewTransfer)}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition-all"
+                  >
+                    <Copy size={13} />
+                    <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handlePrintSingleTransfer(viewTransfer)}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200 rounded-lg text-xs font-bold transition-all"
+                  >
+                    <Printer size={13} />
+                    <span>{language === 'ar' ? 'طابعة' : 'Print'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handlePrintSingleTransfer(viewTransfer)}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all"
+                  >
+                    <FileText size={13} />
+                    <span>PDF</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExportSingleExcel(viewTransfer)}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold transition-all"
+                  >
+                    <Download size={13} />
+                    <span>Excel</span>
+                  </button>
                   {viewTransfer && !viewTransfer.is_reversed && !viewTransfer.is_reversal_doc && (
                     <button
                       type="button"

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, Building2, Calendar, DollarSign, User, Printer, FileText, 
   Clock, Wrench, TrendingUp, AlertTriangle, CheckCircle2, ChevronRight,
-  Download, Paperclip, Share2, Layers, Tag
+  Download, Paperclip, Share2, Layers, Tag, Copy, FileSpreadsheet
 } from 'lucide-react';
 import { FixedAsset, DepreciationScheduleItem } from '../../types/fixedAssets';
 import { fixedAssetService } from '../../services/fixedAssetService';
@@ -17,6 +17,9 @@ interface AssetDetailsModalProps {
   onMaintain?: (asset: FixedAsset) => void;
   onRevalue?: (asset: FixedAsset) => void;
   onDispose?: (asset: FixedAsset) => void;
+  onCopy?: (asset: FixedAsset) => void;
+  onPrint?: (asset: FixedAsset) => void;
+  onExportExcel?: (asset: FixedAsset) => void;
 }
 
 export const AssetDetailsModal: React.FC<AssetDetailsModalProps> = ({
@@ -27,7 +30,10 @@ export const AssetDetailsModal: React.FC<AssetDetailsModalProps> = ({
   onTransfer,
   onMaintain,
   onRevalue,
-  onDispose
+  onDispose,
+  onCopy,
+  onPrint,
+  onExportExcel
 }) => {
   const { language } = useLanguage();
   const isAr = language === 'ar';
@@ -105,14 +111,39 @@ export const AssetDetailsModal: React.FC<AssetDetailsModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 print:hidden">
+          <div className="flex flex-wrap items-center gap-2 print:hidden">
+            {assetData && onCopy && (
+              <button
+                onClick={() => onCopy(assetData)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 rounded-lg text-xs font-semibold transition-colors"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                نسخ
+              </button>
+            )}
             <button
-              onClick={printAssetCard}
+              onClick={() => assetData && onPrint ? onPrint(assetData) : printAssetCard()}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold transition-colors"
             >
-              <Printer className="w-4 h-4" />
-              طباعة البطاقة
+              <Printer className="w-3.5 h-3.5 text-blue-400" />
+              طابعة
             </button>
+            <button
+              onClick={() => assetData && onPrint ? onPrint(assetData) : printAssetCard()}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 rounded-lg text-xs font-semibold transition-colors"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              تصدير PDF
+            </button>
+            {assetData && onExportExcel && (
+              <button
+                onClick={() => onExportExcel(assetData)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-semibold transition-colors"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                تصدير Excel
+              </button>
+            )}
             <button
               onClick={onClose}
               className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"

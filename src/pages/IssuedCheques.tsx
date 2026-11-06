@@ -3,9 +3,11 @@ import {
   Plus, Search, Filter, RefreshCw, Eye, Edit3, Trash2, CheckCircle2, 
   Clock, RotateCcw, Ban, Paperclip, Printer, FileSpreadsheet, ChevronLeft, 
   ChevronRight, Calendar, Building2, User, DollarSign, LayoutDashboard, 
-  ListOrdered, BarChart3, AlertCircle, Check 
+  ListOrdered, BarChart3, AlertCircle, Check, Copy, FileText
 } from 'lucide-react';
 import { IssuedCheque, Supplier, PaymentMethod, IssuedChequeStats, Account } from '../types';
+import { ExportButtons } from '../components/ExportButtons';
+import { exportToExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
 import { issuedChequeService } from '../services/issuedChequeService';
 import { useNotification } from '../contexts/NotificationContext';
@@ -185,8 +187,88 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
   };
 
   const handlePrintCheque = (cheque: IssuedCheque) => {
-    window.print();
+    window.dispatchEvent(new CustomEvent('erp-print-document', {
+      detail: {
+        operationType: 'issued_cheque',
+        documentId: cheque.id,
+        documentData: {
+          ...cheque,
+          doc_number: cheque.serial_number || cheque.cheque_number,
+          date: cheque.issue_date,
+          customer_name: cheque.payee_name || cheque.supplier_name || '-',
+          total_amount: cheque.amount,
+          notes: cheque.description || cheque.notes || ''
+        }
+      }
+    }));
   };
+
+  const handleCopyCheque = (cheque: IssuedCheque) => {
+    let nextChequeNo = '';
+    const digitsMatch = (cheque.cheque_number || '').match(/(\d+)$/);
+    if (digitsMatch) {
+      const numStr = digitsMatch[1];
+      const nextNum = (BigInt(numStr) + 1n).toString().padStart(numStr.length, '0');
+      nextChequeNo = (cheque.cheque_number || '').slice(0, (cheque.cheque_number || '').length - numStr.length) + nextNum;
+    } else if (cheque.cheque_number) {
+      nextChequeNo = `${cheque.cheque_number}-01`;
+    } else {
+      nextChequeNo = `${Date.now().toString().slice(-8)}`;
+    }
+    const copiedCheque: IssuedCheque = {
+      ...cheque,
+      id: '',
+      cheque_number: nextChequeNo,
+      serial_number: '',
+      status: 'DRAFT'
+    };
+    setSelectedChequeForEdit(copiedCheque);
+    const isOther = (cheque as any).cheque_type === 'other' || !cheque.supplier_id;
+    setActiveTab(isOther ? 'create_other' : 'create_supplier');
+    showSuccess(isAr ? `تم نسخ بيانات الشيك برقم جديد (${nextChequeNo})` : `Cheque copied with new number (${nextChequeNo})`);
+  };
+
+  const handleExportSingleChequeExcel = (cheque: IssuedCheque) => {
+    const columns = [
+      { header: isAr ? 'رقم الشيك' : 'Cheque #', key: 'cheque_number' },
+      { header: isAr ? 'المسلسل' : 'Serial #', key: 'serial_number' },
+      { header: isAr ? 'المستفيد / المورد' : 'Beneficiary', key: 'payee' },
+      { header: isAr ? 'الحساب الدائن' : 'Credit Account', key: 'credit_account_name' },
+      { header: isAr ? 'البنك المسحوب عليه' : 'Bank', key: 'bank_name' },
+      { header: isAr ? 'المبلغ' : 'Amount', key: 'amount' },
+      { header: isAr ? 'العملة' : 'Currency', key: 'currency' },
+      { header: isAr ? 'تاريخ التحرير' : 'Issue Date', key: 'issue_date' },
+      { header: isAr ? 'تاريخ الاستحقاق' : 'Due Date', key: 'due_date' },
+      { header: isAr ? 'الحالة' : 'Status', key: 'status' },
+      { header: isAr ? 'البيان' : 'Description', key: 'description' }
+    ];
+    exportToExcel([{
+      cheque_number: cheque.cheque_number,
+      serial_number: cheque.serial_number || '-',
+      payee: cheque.payee_name || cheque.supplier_name || '-',
+      credit_account_name: cheque.credit_account_name || '-',
+      bank_name: cheque.bank_name || '-',
+      amount: cheque.amount,
+      currency: cheque.currency || 'EGP',
+      issue_date: String(cheque.issue_date || '').slice(0, 10),
+      due_date: String(cheque.due_date || '').slice(0, 10),
+      status: cheque.status,
+      description: cheque.description || cheque.notes || '-'
+    }], columns, `Issued_Cheque_${cheque.cheque_number}`);
+  };
+
+  const exportListColumns = [
+    { header: isAr ? 'رقم الشيك' : 'Cheque #', key: 'cheque_number' },
+    { header: isAr ? 'المسلسل' : 'Serial #', key: 'serial_number' },
+    { header: isAr ? 'المستفيد / المورد' : 'Beneficiary', key: 'payee_name' },
+    { header: isAr ? 'الحساب الدائن' : 'Credit Account', key: 'credit_account_name' },
+    { header: isAr ? 'الحساب البنكي' : 'Bank Account', key: 'bank_name' },
+    { header: isAr ? 'المبلغ' : 'Amount', key: 'amount' },
+    { header: isAr ? 'العملة' : 'Currency', key: 'currency' },
+    { header: isAr ? 'تاريخ التحرير' : 'Issue Date', key: 'issue_date' },
+    { header: isAr ? 'تاريخ الاستحقاق' : 'Due Date', key: 'due_date' },
+    { header: isAr ? 'الحالة' : 'Status', key: 'status' }
+  ];
 
   const formatMoney = (val?: number) => {
     return Number(val || 0).toLocaleString(isAr ? 'ar-EG' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -487,6 +569,19 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
               <span>{isAr ? 'استيراد Excel' : 'Import Excel'}</span>
             </button>
 
+            <ExportButtons
+              data={filteredCheques.map(c => ({
+                ...c,
+                payee_name: c.payee_name || c.supplier_name || '-',
+                issue_date: String(c.issue_date || '').slice(0, 10),
+                due_date: String(c.due_date || '').slice(0, 10)
+              }))}
+              columns={exportListColumns}
+              fileName="Issued_Cheques"
+              title={isAr ? 'سجل الشيكات الصادرة' : 'Issued Cheques Register'}
+              operationType="issued_cheque"
+            />
+
             <button
               onClick={fetchData}
               disabled={loading}
@@ -605,6 +700,30 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
                               title={isAr ? 'عرض التفاصيل' : 'View Details'}
                             >
                               <Eye className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              onClick={() => handleCopyCheque(cheque)}
+                              className="p-1.5 rounded-lg text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors cursor-pointer"
+                              title={isAr ? 'نسخ الشيك' : 'Copy Cheque'}
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              onClick={() => handlePrintCheque(cheque)}
+                              className="p-1.5 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer"
+                              title={isAr ? 'طباعة / تصدير PDF' : 'Print / Export PDF'}
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              onClick={() => handleExportSingleChequeExcel(cheque)}
+                              className="p-1.5 rounded-lg text-teal-600 hover:text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-950/40 transition-colors cursor-pointer"
+                              title={isAr ? 'تصدير Excel' : 'Export Excel'}
+                            >
+                              <FileSpreadsheet className="w-3.5 h-3.5" />
                             </button>
 
                             {/* View & Download Attachment */}
@@ -772,6 +891,8 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
         onReturn={cheque => { setSelectedChequeForDetails(null); setSelectedChequeForReturn(cheque); }}
         onCancel={cheque => { setSelectedChequeForDetails(null); setSelectedChequeForCancel(cheque); }}
         onPrint={handlePrintCheque}
+        onCopy={cheque => { setSelectedChequeForDetails(null); handleCopyCheque(cheque); }}
+        onExportExcel={handleExportSingleChequeExcel}
       />
 
       <ChequePaymentModal

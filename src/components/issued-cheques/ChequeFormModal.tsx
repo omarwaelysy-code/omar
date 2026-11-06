@@ -2,8 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, Save, AlertCircle, Calendar, DollarSign, Building2, User, 
   FileText, Paperclip, Trash2, ArrowLeft, CheckCircle2, ShieldCheck, 
-  Layers, Landmark, RefreshCw, Hash, Stamp, Copy, Eye, Download
+  Layers, Landmark, RefreshCw, Hash, Stamp, Copy, Eye, Download, Printer, FileSpreadsheet
 } from 'lucide-react';
+import { exportToExcel } from '../../utils/excelUtils';
 import { IssuedCheque, Supplier, PaymentMethod, IssuedChequeAttachment, Account, Currency, ExchangeRate, Company } from '../../types';
 import { issuedChequeService } from '../../services/issuedChequeService';
 import { dbService, apiRequest } from '../../services/dbService';
@@ -458,6 +459,65 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
     showSuccess(isAr ? `تم نسخ بيانات الشيك برقم جديد (${newChequeNo})، يمكنك الآن التعديل والحفظ كشيك جديد.` : `Cheque data duplicated with new number (${newChequeNo}).`);
   };
 
+  const handlePrintFormCheque = () => {
+    const selectedSupplier = chequeType === 'supplier' ? suppliers.find(s => s.id === supplierId) : null;
+    const selectedCreditAcc = accounts.find(a => a.id === creditAccountId);
+    window.dispatchEvent(new CustomEvent('erp-print-document', {
+      detail: {
+        operationType: 'issued_cheque',
+        documentId: chequeToEdit?.id || '',
+        documentData: {
+          id: chequeToEdit?.id || '',
+          serial_number: serialNumber,
+          doc_number: serialNumber || chequeNumber,
+          cheque_number: chequeNumber,
+          issue_date: issueDate,
+          due_date: dueDate,
+          date: issueDate,
+          payee_name: payeeName || selectedSupplier?.name || '-',
+          supplier_name: selectedSupplier?.name || payeeName || '-',
+          customer_name: payeeName || selectedSupplier?.name || '-',
+          bank_name: selectedFinancialAccount?.bankName || selectedFinancialAccount?.name || '-',
+          credit_account_name: selectedCreditAcc?.name || 'أوراق دفع',
+          amount: numAmount,
+          total_amount: numAmount,
+          currency: currency || 'EGP',
+          description: description || notes || '',
+          notes: notes || description || ''
+        }
+      }
+    }));
+  };
+
+  const handleExportFormExcel = () => {
+    const selectedSupplier = chequeType === 'supplier' ? suppliers.find(s => s.id === supplierId) : null;
+    const selectedCreditAcc = accounts.find(a => a.id === creditAccountId);
+    const columns = [
+      { header: isAr ? 'رقم الشيك' : 'Cheque #', key: 'cheque_number' },
+      { header: isAr ? 'المسلسل' : 'Serial #', key: 'serial_number' },
+      { header: isAr ? 'المستفيد' : 'Beneficiary', key: 'payee' },
+      { header: isAr ? 'البنك' : 'Bank', key: 'bank' },
+      { header: isAr ? 'الحساب الدائن' : 'Credit Account', key: 'credit_account' },
+      { header: isAr ? 'المبلغ' : 'Amount', key: 'amount' },
+      { header: isAr ? 'العملة' : 'Currency', key: 'currency' },
+      { header: isAr ? 'تاريخ التحرير' : 'Issue Date', key: 'issue_date' },
+      { header: isAr ? 'تاريخ الاستحقاق' : 'Due Date', key: 'due_date' },
+      { header: isAr ? 'البيان' : 'Description', key: 'description' }
+    ];
+    exportToExcel([{
+      cheque_number: chequeNumber || '-',
+      serial_number: serialNumber || '-',
+      payee: payeeName || selectedSupplier?.name || '-',
+      bank: selectedFinancialAccount?.bankName || selectedFinancialAccount?.name || '-',
+      credit_account: selectedCreditAcc?.name || 'أوراق دفع',
+      amount: numAmount,
+      currency: currency || 'EGP',
+      issue_date: issueDate,
+      due_date: dueDate,
+      description: description || notes || '-'
+    }], columns, `Issued_Cheque_${chequeNumber || 'Draft'}`);
+  };
+
   // When supplier changes, auto-populate payee name if empty
   const handleSupplierChange = (sId: string) => {
     setSupplierId(sId);
@@ -809,6 +869,36 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
           >
             <Copy className="w-4 h-4" />
             <span>{isAr ? 'نسخ' : 'Copy'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePrintFormCheque}
+            className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-xs"
+            title={isAr ? 'طباعة الشيك' : 'Print Cheque'}
+          >
+            <Printer className="w-4 h-4 text-emerald-600" />
+            <span>{isAr ? 'طابعة' : 'Print'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePrintFormCheque}
+            className="px-3 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 hover:bg-rose-100 text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-xs"
+            title={isAr ? 'تصدير PDF' : 'Export PDF'}
+          >
+            <FileText className="w-4 h-4" />
+            <span>{isAr ? 'تصدير PDF' : 'PDF'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportFormExcel}
+            className="px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-xs"
+            title={isAr ? 'تصدير إكسيل' : 'Export Excel'}
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>{isAr ? 'تصدير Excel' : 'Excel'}</span>
           </button>
 
           {/* Close / Back to List Button */}

@@ -12,7 +12,7 @@ import {
   FileSpreadsheet, UploadCloud, Download, CheckCircle2, AlertTriangle, 
   Trash2, Edit3, ChevronDown, ChevronUp, FileText, ArrowUpFromLine, 
   ArrowDownToLine, RotateCcw, Hash, Calendar, Layers, ShieldCheck, 
-  X, Check, RefreshCw, Eye, Sparkles, ExternalLink, Plus
+  X, Check, RefreshCw, Eye, Sparkles, ExternalLink, Plus, Copy, Printer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -3181,6 +3181,50 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     showNotification(isAr ? `تم تصدير إكسيل التشغيلة ${batch.batch_number} بنجاح` : `Batch ${batch.batch_number} Excel exported successfully`, 'success');
   };
 
+  const handlePrintBatch = (batch: any) => {
+    window.dispatchEvent(new CustomEvent('erp-print-document', {
+      detail: {
+        operationType: isSales ? 'invoice' : 'purchase_invoice',
+        documentId: batch?.id || '',
+        documentData: {
+          doc_number: batch?.batch_number || batchNumber,
+          invoice_number: batch?.batch_number || batchNumber,
+          date: batch?.batch_date || batchDate,
+          customer_name: isSales ? 'دفعة استيراد مبيعات' : 'دفعة استيراد مشتريات',
+          supplier_name: isSales ? 'دفعة استيراد مبيعات' : 'دفعة استيراد مشتريات',
+          total_amount: Number(batch?.total_amount) || 0,
+          notes: `عدد المستندات: ${batch?.total_documents || documents.length}`,
+          items: (batch?.details || documents || []).map((d: any) => ({
+            product_code: d.created_document_number || d.ref,
+            product_name: `${d.doc_type} - ${d.party_name}`,
+            quantity: 1,
+            unit_price: d.total_amount || 0,
+            total: d.total_amount || 0
+          }))
+        }
+      }
+    }));
+  };
+
+  const handleCopyBatchToImport = (batch: any) => {
+    if (!batch || !Array.isArray(batch.details)) return;
+    const copiedDocs = batch.details.map((d: any, idx: number) => ({
+      ...d,
+      ref: `${d.ref || (idx + 1)}-COPY`,
+      status: 'pending',
+      created_document_id: undefined,
+      created_document_number: undefined,
+      created_journal_id: undefined,
+      created_journal_number: undefined,
+      error_message: undefined,
+      is_modified: true
+    }));
+    setDocuments(copiedDocs);
+    setIsBatchSaved(false);
+    setActiveMainTab('import');
+    showNotification(isAr ? `تم نسخ مستندات التشغيلة (${batch.batch_number}) كتشغيلة جديدة جاهزة للمراجعة والحفظ` : `Batch ${batch.batch_number} copied as new batch`, 'success');
+  };
+
   return (
     <div className="w-full px-2 sm:px-4 py-2.5 space-y-2.5" dir={dir}>
       
@@ -3337,8 +3381,22 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                                 <span>{isAr ? "المستندات والقيود" : "Docs & Journals"}</span>
                               </button>
                               <button
+                                onClick={() => handleCopyBatchToImport(batch)}
+                                className="p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50 border border-indigo-200 cursor-pointer"
+                                title={isAr ? "نسخ التشغيلة" : "Copy Batch"}
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handlePrintBatch(batch)}
+                                className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 border border-emerald-200 cursor-pointer"
+                                title={isAr ? "طباعة / تصدير PDF" : "Print / Export PDF"}
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                              </button>
+                              <button
                                 onClick={() => handleExportPastBatch(batch)}
-                                className="p-1 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 cursor-pointer"
+                                className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 cursor-pointer"
                                 title={isAr ? "تصدير إكسيل التشغيلة" : "Export Batch Excel"}
                               >
                                 <Download className="w-3.5 h-3.5" />
@@ -3463,6 +3521,27 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   <Download className="w-3 h-3" />
                   <span>{isAr ? 'تحميل النموذج' : 'Download Template'}</span>
                 </button>
+
+                {documents.length > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handlePrintBatch({ batch_number: batchNumber, batch_date: batchDate, total_documents: documents.length, total_amount: documents.reduce((s, d) => s + d.total_amount, 0), details: documents })}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-2 py-0.5 rounded-lg cursor-pointer"
+                    >
+                      <Printer className="w-3 h-3 text-emerald-600" />
+                      <span>{isAr ? 'طابعة / PDF' : 'Print / PDF'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleExportAfterSave}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-2 py-0.5 rounded-lg cursor-pointer"
+                    >
+                      <FileSpreadsheet className="w-3 h-3" />
+                      <span>{isAr ? 'تصدير Excel' : 'Export Excel'}</span>
+                    </button>
+                  </>
+                )}
 
                 {/* 1. Save Changes Button at Top of Screen (Requirement 1) */}
                 {documents.length > 0 && (

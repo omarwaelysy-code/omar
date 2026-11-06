@@ -4,10 +4,11 @@ import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService, apiRequest } from '../services/dbService';
 import { Account, Customer, Supplier, JournalEntry, JournalEntryItem, Department, CostCenter, Operation, Currency, AccountType, ExchangeRate } from '../types';
-import { Plus, Trash2, Save, AlertCircle, CheckCircle2, ArrowRightLeft, User, Truck, Copy, X, Check, Search, Info, CheckCheck, FileSpreadsheet } from 'lucide-react';
+import { Plus, Trash2, Save, AlertCircle, CheckCircle2, ArrowRightLeft, User, Truck, Copy, X, Check, Search, Info, CheckCheck, FileSpreadsheet, Printer, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatNumber } from '../utils/formatUtils';
 import { ExcelImportWizard } from '../components/ExcelImportWizard';
+import { exportToExcel } from '../utils/excelUtils';
 
 const normalizeText = (text: string): string => {
   if (!text) return '';
@@ -114,6 +115,23 @@ export const CreateJournalEntry: React.FC = () => {
 
   // Click outside to close active search
   useEffect(() => {
+    if ( user && sessionStorage.getItem('erp_copied_journal_entry')) {
+      try {
+        const parsed = JSON.parse(sessionStorage.getItem('erp_copied_journal_entry') || '{}');
+        sessionStorage.removeItem('erp_copied_journal_entry');
+        if (parsed && Array.isArray(parsed.items) && parsed.items.length > 0) {
+          setFormData({
+            date: new Date().toISOString().split('T')[0],
+            description: parsed.description || '',
+            reference_number: parsed.reference_number || '',
+            items: parsed.items
+          } as any);
+          showNotification('تم نسخ القيد بنجاح! يمكنك الآن تعديله وحفظه.', 'success');
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
     const handleOutsideClick = () => {
       setActiveRowSearch(null);
       setActiveHeaderSearch(null);
@@ -497,6 +515,61 @@ export const CreateJournalEntry: React.FC = () => {
     (e.description && e.description.toLowerCase().includes(copySearchQuery.toLowerCase()))
   );
 
+  const handlePrintCurrentEntry = () => {
+    window.dispatchEvent(new CustomEvent('erp-print-document', {
+      detail: {
+        operationType: 'journal_entry',
+        documentId: '',
+        documentData: {
+          entry_number: entryNumber || 'JE-DRAFT',
+          doc_number: entryNumber || 'JE-DRAFT',
+          date: formData.date,
+          description: formData.description || '-',
+          notes: formData.description || '-',
+          reference_number: formData.reference_number || '-',
+          total_debit: totalDebit,
+          total_credit: totalCredit,
+          total_amount: totalDebit,
+          items: formData.items.map((item: any) => {
+            const acc = accounts.find(a => a.id === item.account_id);
+            return {
+              account_code: acc?.code || '-',
+              account_name: item.account_name || acc?.name || '-',
+              debit: Number(item.debit) || 0,
+              credit: Number(item.credit) || 0,
+              description: item.description || formData.description || '-'
+            };
+          })
+        }
+      }
+    }));
+  };
+
+  const handleExportCurrentEntryExcel = () => {
+    const columns = [
+      { header: language === 'ar' ? 'رقم القيد' : 'Entry #', key: 'entry_number' },
+      { header: language === 'ar' ? 'التاريخ' : 'Date', key: 'date' },
+      { header: language === 'ar' ? 'كود الحساب' : 'Account Code', key: 'account_code' },
+      { header: language === 'ar' ? 'اسم الحساب' : 'Account Name', key: 'account_name' },
+      { header: language === 'ar' ? 'مدين' : 'Debit', key: 'debit' },
+      { header: language === 'ar' ? 'دائن' : 'Credit', key: 'credit' },
+      { header: language === 'ar' ? 'البيان' : 'Description', key: 'description' }
+    ];
+    const rows = formData.items.map((item: any) => {
+      const acc = accounts.find(a => a.id === item.account_id);
+      return {
+        entry_number: entryNumber || 'JE-DRAFT',
+        date: formData.date,
+        account_code: acc?.code || '-',
+        account_name: item.account_name || acc?.name || '-',
+        debit: Number(item.debit) || 0,
+        credit: Number(item.credit) || 0,
+        description: item.description || formData.description || '-'
+      };
+    });
+    exportToExcel(rows, columns, `Journal_Entry_${entryNumber || 'Draft'}`);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
       {/* Top Header Row with Title and Action Buttons */}
@@ -522,6 +595,33 @@ export const CreateJournalEntry: React.FC = () => {
           >
             <Copy size={16} />
             <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={handlePrintCurrentEntry}
+            className="flex items-center gap-1.5 px-3 py-2 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 rounded-xl font-bold text-xs transition-all border border-zinc-200"
+            title={language === 'ar' ? 'طباعة القيد' : 'Print Entry'}
+          >
+            <Printer size={16} className="text-emerald-600" />
+            <span>{language === 'ar' ? 'طابعة' : 'Print'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={handlePrintCurrentEntry}
+            className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl font-bold text-xs transition-all border border-rose-200"
+            title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
+          >
+            <FileText size={16} />
+            <span>{language === 'ar' ? 'تصدير PDF' : 'Export PDF'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleExportCurrentEntryExcel}
+            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold text-xs transition-all border border-emerald-200"
+            title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+          >
+            <FileSpreadsheet size={16} />
+            <span>{language === 'ar' ? 'تصدير Excel' : 'Export Excel'}</span>
           </button>
           <button
             type="button"

@@ -18,6 +18,7 @@ export interface ContactMessage {
   message: string;
   status: 'new' | 'read' | 'archived';
   created_at: string;
+  last_activity_at?: string | null;
   read_at?: string;
   handled_by?: string;
   notes?: string;
@@ -51,6 +52,7 @@ export interface InternalMessage {
   archived_by?: string[];
   deleted_by?: string[];
   created_at: string;
+  last_activity_at?: string | null;
   updated_at?: string;
 }
 
@@ -70,6 +72,7 @@ export interface User {
   must_change_password?: boolean;
   temp_password?: string;
   created_at: string;
+  last_activity_at?: string | null;
 }
 
 export interface AuditLog {
@@ -86,6 +89,7 @@ export interface AuditLog {
   severity: 'info' | 'warning' | 'critical';
   ip_address?: string;
   created_at: string;
+  last_activity_at?: string | null;
   company_id: string;
 }
 
@@ -121,6 +125,7 @@ export interface Company {
   company_status: 'active' | 'suspended';
   features: string[]; // List of enabled feature IDs
   created_at: string;
+  last_activity_at?: string | null;
   vat_enabled?: boolean;
   wht_enabled?: boolean;
   sales_wht_enabled?: boolean;
@@ -164,6 +169,7 @@ export interface PosBranchLinkingCode {
   expires_at: string;
   created_by?: string;
   created_at: string;
+  last_activity_at?: string | null;
   used_at?: string;
   used_by_device?: string;
 }
@@ -179,6 +185,7 @@ export interface PosConnectedBranch {
   status: 'pending' | 'used' | 'expired' | 'revoked';
   expires_at: string;
   created_at: string;
+  last_activity_at?: string | null;
   last_seen_at?: string | null;
   branch_name: string;
   branch_address: string;
@@ -196,6 +203,7 @@ export interface Currency {
   is_active: boolean;
   company_id: string;
   created_at: string;
+  last_activity_at?: string | null;
 }
 
 export interface ExchangeRate {
@@ -206,6 +214,7 @@ export interface ExchangeRate {
   notes?: string;
   created_by: string;
   created_at: string;
+  last_activity_at?: string | null;
   company_id: string;
 }
 
@@ -384,6 +393,7 @@ export interface CashTransfer extends ReversalTrackingFields {
   description: string;
   company_id: string;
   created_at: string;
+  last_activity_at?: string | null;
   created_by: string;
   entry_number?: string;
   transfer_number?: string;
@@ -952,6 +962,7 @@ export interface ActivityLog {
   user_email?: string;
   company_id: string;
   created_at: string;
+  last_activity_at?: string | null;
   module: string;
   action: string;
   details: string;
@@ -1051,6 +1062,7 @@ export interface JournalEntry extends ReversalTrackingFields {
   company_id: string;
   items: JournalEntryItem[];
   created_at: string;
+  last_activity_at?: string | null;
   created_by: string;
 }
 

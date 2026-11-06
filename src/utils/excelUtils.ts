@@ -146,18 +146,33 @@ export const sanitizeSheetName = (name?: string): string => {
   return clean.slice(0, 31) || 'Sheet1';
 };
 
-export const exportToExcel = (data: any[], options: string | ExcelOptions) => {
-  const opts: ExcelOptions = typeof options === 'string' ? { filename: options } : options;
+export const exportToExcel = (
+  data: any[],
+  options: string | ExcelOptions | Array<{ header: string; key: string }>,
+  filenameArg?: string
+) => {
+  let targetData = data;
+  let opts: ExcelOptions;
+  if (Array.isArray(options)) {
+    const keyMap: Record<string, string> = {};
+    options.forEach(col => {
+      keyMap[col.key] = col.header;
+    });
+    targetData = formatDataForExcel(data, keyMap);
+    opts = { filename: filenameArg || 'export' };
+  } else {
+    opts = typeof options === 'string' ? { filename: options } : options;
+  }
   const { filename } = opts;
   const safeSheetName = sanitizeSheetName(opts.sheetName);
   
-  if (!data || data.length === 0) {
+  if (!targetData || targetData.length === 0) {
     console.warn('No data to export to Excel');
     return;
   }
 
   // Sanitize data
-  const sanitizedData = sanitizeForExcel(data);
+  const sanitizedData = sanitizeForExcel(targetData);
 
   // Function to apply number format to numeric cells in a worksheet
   const applyNumberFormat = (ws: XLSX.WorkSheet) => {

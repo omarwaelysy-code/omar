@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { 
   Lock, Unlock, ShieldAlert, Calendar, KeyRound, CheckCircle2, 
   XCircle, Search, RefreshCw, AlertTriangle, ShieldCheck, Edit3, 
-  FileText, Database as DatabaseIcon
+  FileText, Database as DatabaseIcon, Copy, Printer, FileSpreadsheet
 } from 'lucide-react';
+import { ExportButtons } from '../components/ExportButtons';
+import { exportToExcel } from '../utils/excelUtils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService, apiRequest } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -141,6 +143,45 @@ export function PeriodClosing() {
     setModalIsClosed(record.is_closed);
     setIsModalOpen(true);
   };
+
+  const handlePrintClosing = (record: PeriodClosingRecord) => {
+    const label = moduleLabels[record.module_name];
+    const displayName = language === 'ar' ? (label ? label.ar : record.module_name) : (label ? label.en : record.module_name);
+    window.dispatchEvent(new CustomEvent('erp-print-document', {
+      detail: {
+        operationType: 'period_closing',
+        documentId: record.module_name,
+        documentData: {
+          doc_number: `CLS-${record.module_name.toUpperCase()}`,
+          date: record.closing_date || new Date().toISOString().slice(0, 10),
+          customer_name: displayName,
+          notes: record.is_closed ? 'مغلقة ومحمية بكلمة مرور' : 'مفتوحة'
+        }
+      }
+    }));
+  };
+
+  const handleExportSingleClosingExcel = (record: PeriodClosingRecord) => {
+    const label = moduleLabels[record.module_name];
+    const displayName = language === 'ar' ? (label ? label.ar : record.module_name) : (label ? label.en : record.module_name);
+    const cols = [
+      { header: language === 'ar' ? 'اسم الحركة' : 'Module', key: 'name' },
+      { header: language === 'ar' ? 'تاريخ الإغلاق' : 'Closing Date', key: 'closing_date' },
+      { header: language === 'ar' ? 'الحالة' : 'Status', key: 'status' }
+    ];
+    exportToExcel([{
+      name: displayName,
+      closing_date: record.closing_date || '-',
+      status: record.is_closed ? (language === 'ar' ? 'مغلقة' : 'Closed') : (language === 'ar' ? 'مفتوحة' : 'Open')
+    }], cols, `Period_Closing_${record.module_name}`);
+  };
+
+  const exportListColumns = [
+    { header: language === 'ar' ? 'اسم الحركة' : 'Operation / Document', key: 'display_name' },
+    { header: language === 'ar' ? 'كود النظام' : 'System Code', key: 'module_name' },
+    { header: language === 'ar' ? 'تاريخ آخر إغلاق' : 'Closing Date', key: 'closing_date' },
+    { header: language === 'ar' ? 'الحالة' : 'Status', key: 'status_text' }
+  ];
 
   const handleIndividualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -305,13 +346,30 @@ export function PeriodClosing() {
               : 'Secure and protect financial transactions and master data from editing with password.'}
           </p>
         </div>
-        <button 
-          onClick={fetchClosings}
-          className="flex items-center gap-2 px-6 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-2xl transition-all font-bold shadow-sm"
-        >
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          {language === 'ar' ? 'تحديث البيانات' : 'Refresh'}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <ExportButtons
+            data={displayedClosings.map(c => {
+              const label = moduleLabels[c.module_name];
+              return {
+                ...c,
+                display_name: language === 'ar' ? (label ? label.ar : c.module_name) : (label ? label.en : c.module_name),
+                closing_date: c.closing_date || '-',
+                status_text: c.is_closed ? (language === 'ar' ? 'مغلقة' : 'Closed') : (language === 'ar' ? 'مفتوحة' : 'Open')
+              };
+            })}
+            columns={exportListColumns}
+            fileName="Period_Closings"
+            title={language === 'ar' ? 'محضر إغلاق الفترات المحاسبية' : 'Accounting Period Closing Report'}
+            operationType="period_closing"
+          />
+          <button 
+            onClick={fetchClosings}
+            className="flex items-center gap-2 px-6 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-2xl transition-all font-bold shadow-sm"
+          >
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            {language === 'ar' ? 'تحديث البيانات' : 'Refresh'}
+          </button>
+        </div>
       </div>
 
       {/* Tabs Switcher */}
@@ -546,6 +604,35 @@ export function PeriodClosing() {
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => {
+                            if (closing.closing_date) {
+                              if (activeTab === 'transactions') setTxBulkDate(closing.closing_date);
+                              else setMdBulkDate(closing.closing_date);
+                              showNotification(language === 'ar' ? `تم نسخ تاريخ الإغلاق (${closing.closing_date})` : `Closing date copied (${closing.closing_date})`, 'success');
+                            } else {
+                              handleOpenModal(closing);
+                            }
+                          }}
+                          className="p-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl transition-all"
+                          title={language === 'ar' ? 'نسخ تاريخ الإغلاق' : 'Copy Closing Date'}
+                        >
+                          <Copy size={13} />
+                        </button>
+                        <button
+                          onClick={() => handlePrintClosing(closing)}
+                          className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-xl transition-all"
+                          title={language === 'ar' ? 'طباعة / PDF' : 'Print / PDF'}
+                        >
+                          <Printer size={13} />
+                        </button>
+                        <button
+                          onClick={() => handleExportSingleClosingExcel(closing)}
+                          className="p-1.5 bg-teal-50 text-teal-600 hover:bg-teal-100 rounded-xl transition-all"
+                          title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+                        >
+                          <FileSpreadsheet size={13} />
+                        </button>
                         <button
                           onClick={() => handleOpenModal(closing)}
                           className="flex items-center gap-1 px-3 py-1.5 bg-white border border-zinc-200 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 text-zinc-600 rounded-xl transition-all font-bold text-xs shadow-sm"

@@ -3,9 +3,11 @@ import {
   Plus, Search, Filter, RefreshCw, Eye, Edit3, Trash2, CheckCircle2, 
   Clock, RotateCcw, Ban, Paperclip, Printer, FileSpreadsheet, ChevronLeft, 
   ChevronRight, Calendar, Building2, User, DollarSign, LayoutDashboard, 
-  ListOrdered, BarChart3, AlertCircle, Check, ArrowDownLeft 
+  ListOrdered, BarChart3, AlertCircle, Check, ArrowDownLeft, Copy, FileText
 } from 'lucide-react';
 import { ReceivedCheque, Customer, PaymentMethod, ReceivedChequeStats, Account } from '../types';
+import { ExportButtons } from '../components/ExportButtons';
+import { exportToExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
 import { receivedChequeService } from '../services/receivedChequeService';
 import { useNotification } from '../contexts/NotificationContext';
@@ -172,6 +174,92 @@ export const ReceivedCheques: React.FC<ReceivedChequesProps> = ({ initialTab = '
   const formatMoney = (val?: number) => {
     return Number(val || 0).toLocaleString(isAr ? 'ar-EG' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
+
+  const handlePrintCheque = (cheque: ReceivedCheque) => {
+    window.dispatchEvent(new CustomEvent('erp-print-document', {
+      detail: {
+        operationType: 'received_cheque',
+        documentId: cheque.id,
+        documentData: {
+          ...cheque,
+          doc_number: cheque.receipt_number || cheque.serial_number || cheque.cheque_number,
+          date: cheque.receipt_date,
+          customer_name: cheque.customer_name || cheque.payer_name || '-',
+          bank_name: cheque.drawee_bank || cheque.deposit_bank_name || '-',
+          total_amount: cheque.amount,
+          notes: cheque.purpose || cheque.notes || ''
+        }
+      }
+    }));
+  };
+
+  const handleCopyCheque = (cheque: ReceivedCheque) => {
+    let nextChequeNo = '';
+    const digitsMatch = (cheque.cheque_number || '').match(/(\d+)$/);
+    if (digitsMatch) {
+      const numStr = digitsMatch[1];
+      const nextNum = (BigInt(numStr) + 1n).toString().padStart(numStr.length, '0');
+      nextChequeNo = (cheque.cheque_number || '').slice(0, (cheque.cheque_number || '').length - numStr.length) + nextNum;
+    } else if (cheque.cheque_number) {
+      nextChequeNo = `${cheque.cheque_number}-01`;
+    } else {
+      nextChequeNo = `${Date.now().toString().slice(-8)}`;
+    }
+    const copiedCheque: ReceivedCheque = {
+      ...cheque,
+      id: '',
+      cheque_number: nextChequeNo,
+      receipt_number: '',
+      serial_number: '',
+      status: 'RECEIVED'
+    };
+    setSelectedChequeForEdit(copiedCheque);
+    const isOther = String(cheque.cheque_type || '').toUpperCase() === 'OTHER' || !cheque.customer_id;
+    setActiveTab(isOther ? 'receive_other' : 'receive_customer');
+    showSuccess(isAr ? `تم نسخ بيانات الشيك الوارد برقم جديد (${nextChequeNo})` : `Received cheque copied with new number (${nextChequeNo})`);
+  };
+
+  const handleExportSingleChequeExcel = (cheque: ReceivedCheque) => {
+    const columns = [
+      { header: isAr ? 'رقم الشيك' : 'Cheque #', key: 'cheque_number' },
+      { header: isAr ? 'رقم الإيصال' : 'Receipt #', key: 'receipt_number' },
+      { header: isAr ? 'العميل / الساحب' : 'Customer / Payer', key: 'payer' },
+      { header: isAr ? 'حساب أوراق القبض' : 'Notes Rec. Account', key: 'debit_account_name' },
+      { header: isAr ? 'البنك المسحوب عليه' : 'Drawee Bank', key: 'drawee_bank' },
+      { header: isAr ? 'المبلغ' : 'Amount', key: 'amount' },
+      { header: isAr ? 'العملة' : 'Currency', key: 'currency' },
+      { header: isAr ? 'تاريخ الاستلام' : 'Receipt Date', key: 'receipt_date' },
+      { header: isAr ? 'تاريخ الاستحقاق' : 'Due Date', key: 'due_date' },
+      { header: isAr ? 'الحالة' : 'Status', key: 'status' },
+      { header: isAr ? 'البيان' : 'Purpose', key: 'purpose' }
+    ];
+    exportToExcel([{
+      cheque_number: cheque.cheque_number,
+      receipt_number: cheque.receipt_number || '-',
+      payer: cheque.customer_name || cheque.payer_name || '-',
+      debit_account_name: cheque.debit_account_name || '-',
+      drawee_bank: cheque.drawee_bank || '-',
+      amount: cheque.amount,
+      currency: cheque.currency || 'EGP',
+      receipt_date: String(cheque.receipt_date || '').slice(0, 10),
+      due_date: String(cheque.due_date || '').slice(0, 10),
+      status: cheque.status,
+      purpose: cheque.purpose || cheque.notes || '-'
+    }], columns, `Received_Cheque_${cheque.cheque_number}`);
+  };
+
+  const exportListColumns = [
+    { header: isAr ? 'رقم الشيك' : 'Cheque #', key: 'cheque_number' },
+    { header: isAr ? 'رقم الإيصال' : 'Receipt #', key: 'receipt_number' },
+    { header: isAr ? 'العميل / الساحب' : 'Customer / Payer', key: 'customer_name' },
+    { header: isAr ? 'حساب أوراق القبض' : 'Notes Rec. Account', key: 'debit_account_name' },
+    { header: isAr ? 'البنك المسحوب عليه' : 'Drawee Bank', key: 'drawee_bank' },
+    { header: isAr ? 'المبلغ' : 'Amount', key: 'amount' },
+    { header: isAr ? 'العملة' : 'Currency', key: 'currency' },
+    { header: isAr ? 'تاريخ الاستلام' : 'Receipt Date', key: 'receipt_date' },
+    { header: isAr ? 'تاريخ الاستحقاق' : 'Due Date', key: 'due_date' },
+    { header: isAr ? 'الحالة' : 'Status', key: 'status' }
+  ];
 
   const currencyLabel = isAr ? 'ج.م' : 'EGP';
 
@@ -453,6 +541,19 @@ export const ReceivedCheques: React.FC<ReceivedChequesProps> = ({ initialTab = '
               <span>{isAr ? 'استيراد Excel' : 'Import Excel'}</span>
             </button>
 
+            <ExportButtons
+              data={filteredCheques.map(c => ({
+                ...c,
+                customer_name: c.customer_name || c.payer_name || '-',
+                receipt_date: String(c.receipt_date || '').slice(0, 10),
+                due_date: String(c.due_date || '').slice(0, 10)
+              }))}
+              columns={exportListColumns}
+              fileName="Received_Cheques"
+              title={isAr ? 'سجل الشيكات الواردة (أوراق القبض)' : 'Received Cheques Register'}
+              operationType="received_cheque"
+            />
+
             <button
               onClick={fetchData}
               disabled={loading}
@@ -597,6 +698,30 @@ export const ReceivedCheques: React.FC<ReceivedChequesProps> = ({ initialTab = '
                               <Eye className="w-4 h-4" />
                             </button>
 
+                            <button
+                              onClick={() => handleCopyCheque(cheque)}
+                              className="p-1.5 rounded-lg text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors cursor-pointer"
+                              title={isAr ? 'نسخ الشيك' : 'Copy Cheque'}
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              onClick={() => handlePrintCheque(cheque)}
+                              className="p-1.5 rounded-lg text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors cursor-pointer"
+                              title={isAr ? 'طباعة / تصدير PDF' : 'Print / Export PDF'}
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              onClick={() => handleExportSingleChequeExcel(cheque)}
+                              className="p-1.5 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer"
+                              title={isAr ? 'تصدير Excel' : 'Export Excel'}
+                            >
+                              <FileSpreadsheet className="w-3.5 h-3.5" />
+                            </button>
+
                             {/* Attachment Action Button */}
                             {cheque.attachments && cheque.attachments.length > 0 && (
                               <button
@@ -722,6 +847,9 @@ export const ReceivedCheques: React.FC<ReceivedChequesProps> = ({ initialTab = '
         onPostpone={cheque => setSelectedChequeForPostpone(cheque)}
         onReturn={cheque => setSelectedChequeForReturn(cheque)}
         onCancel={cheque => setSelectedChequeForCancel(cheque)}
+        onPrint={handlePrintCheque}
+        onCopy={cheque => { setSelectedChequeForDetails(null); handleCopyCheque(cheque); }}
+        onExportExcel={handleExportSingleChequeExcel}
       />
 
       {/* Collect Modal */}

@@ -3,8 +3,9 @@ import {
   X, Save, Plus, Trash2, Calendar, User, FileText, Paperclip, 
   CheckCircle2, ShieldCheck, Layers, Building2, AlertCircle, 
   ArrowLeft, RefreshCw, Hash, DollarSign, Coins, TrendingUp,
-  Eye, Download
+  Eye, Download, Copy, Printer, FileSpreadsheet
 } from 'lucide-react';
+import { exportToExcel } from '../../utils/excelUtils';
 import { ReceivedCheque, Customer, PaymentMethod, Account, IssuedChequeAttachment, Currency, ExchangeRate, Company } from '../../types';
 import { receivedChequeService } from '../../services/receivedChequeService';
 import { dbService, apiRequest } from '../../services/dbService';
@@ -456,6 +457,77 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
     setAttachments(prev => prev.filter(a => a.id !== id));
   };
 
+  const handleDuplicateForm = () => {
+    setChequeRows(prev => prev.map(r => {
+      let nextNo = r.cheque_number || '';
+      const m = nextNo.match(/(\d+)$/);
+      if (m) {
+        const numStr = m[1];
+        const nextNum = (BigInt(numStr) + 1n).toString().padStart(numStr.length, '0');
+        nextNo = nextNo.slice(0, nextNo.length - numStr.length) + nextNum;
+      } else if (nextNo) {
+        nextNo = `${nextNo}-01`;
+      }
+      return { ...r, cheque_number: nextNo };
+    }));
+    showSuccess(isAr ? 'تم نسخ بيانات الشيكات بأرقام جديدة' : 'Cheques duplicated with new numbers');
+  };
+
+  const handlePrintForm = () => {
+    const selectedCustomer = customers.find(c => c.id === customerId);
+    const firstRow = chequeRows[0];
+    window.dispatchEvent(new CustomEvent('erp-print-document', {
+      detail: {
+        operationType: 'received_cheque',
+        documentId: chequeToEdit?.id || '',
+        documentData: {
+          id: chequeToEdit?.id || '',
+          receipt_number: receiptNumber,
+          doc_number: receiptNumber,
+          cheque_number: chequeRows.map(r => r.cheque_number).filter(Boolean).join(', ') || '-',
+          receipt_date: receiveDate,
+          date: receiveDate,
+          due_date: firstRow?.due_date || receiveDate,
+          customer_name: selectedCustomer?.name || payerName || '-',
+          payer_name: payerName || selectedCustomer?.name || '-',
+          drawee_bank: firstRow?.bank_name || '-',
+          bank_name: firstRow?.bank_name || '-',
+          amount: totalChequesAmount,
+          total_amount: totalChequesAmount,
+          currency: currency || 'EGP',
+          purpose: purpose || notes || '',
+          notes: notes || purpose || ''
+        }
+      }
+    }));
+  };
+
+  const handleExportFormExcel = () => {
+    const selectedCustomer = customers.find(c => c.id === customerId);
+    const columns = [
+      { header: isAr ? 'رقم الإيصال' : 'Receipt #', key: 'receipt_number' },
+      { header: isAr ? 'رقم الشيك' : 'Cheque #', key: 'cheque_number' },
+      { header: isAr ? 'العميل / الساحب' : 'Customer / Payer', key: 'payer' },
+      { header: isAr ? 'البنك المسحوب عليه' : 'Drawee Bank', key: 'bank_name' },
+      { header: isAr ? 'المبلغ' : 'Amount', key: 'amount' },
+      { header: isAr ? 'العملة' : 'Currency', key: 'currency' },
+      { header: isAr ? 'تاريخ الاستلام' : 'Receipt Date', key: 'receive_date' },
+      { header: isAr ? 'تاريخ الاستحقاق' : 'Due Date', key: 'due_date' },
+      { header: isAr ? 'البيان' : 'Purpose', key: 'purpose' }
+    ];
+    exportToExcel(chequeRows.map(r => ({
+      receipt_number: receiptNumber || '-',
+      cheque_number: r.cheque_number || '-',
+      payer: selectedCustomer?.name || payerName || '-',
+      bank_name: r.bank_name || '-',
+      amount: parseFloat(r.amount) || 0,
+      currency: currency || 'EGP',
+      receive_date: receiveDate,
+      due_date: r.due_date || receiveDate,
+      purpose: purpose || notes || '-'
+    })), columns, `Received_Cheque_${receiptNumber || 'Draft'}`);
+  };
+
   // Form Submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -549,15 +621,49 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
           </div>
         </div>
 
-        {!inline && (
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            onClick={handleDuplicateForm}
+            className="px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <Copy className="w-3.5 h-3.5" />
+            <span>{isAr ? 'نسخ' : 'Copy'}</span>
           </button>
-        )}
+          <button
+            type="button"
+            onClick={handlePrintForm}
+            className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <Printer className="w-3.5 h-3.5 text-blue-600" />
+            <span>{isAr ? 'طابعة' : 'Print'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={handlePrintForm}
+            className="px-3 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 hover:bg-rose-100 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>{isAr ? 'تصدير PDF' : 'PDF'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleExportFormExcel}
+            className="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>{isAr ? 'تصدير Excel' : 'Excel'}</span>
+          </button>
+          {!inline && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {validationError && (

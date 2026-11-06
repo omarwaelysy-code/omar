@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Download, FileText, Printer, ChevronDown } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { exportToExcel } from '../utils/excelUtils';
 
 interface ExportButtonsProps {
-  onExportExcel: () => void;
-  onExportPDF: () => void;
+  onExportExcel?: () => void;
+  onExportPDF?: () => void;
   onPrint?: () => void;
   onExportExcelSelected?: () => void;
   onExportPDFSelected?: () => void;
@@ -13,6 +14,11 @@ interface ExportButtonsProps {
   className?: string;
   showPrint?: boolean;
   size?: 'sm' | 'md';
+  data?: any[];
+  columns?: Array<{ header: string; key: string }>;
+  fileName?: string;
+  title?: string;
+  operationType?: string;
 }
 
 export const ExportButtons: React.FC<ExportButtonsProps> = ({ 
@@ -25,8 +31,32 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
   selectedCount = 0,
   className = "",
   showPrint = true,
-  size = 'md'
+  size = 'md',
+  data,
+  columns,
+  fileName = 'export',
+  title,
+  operationType
 }) => {
+  const handleDefaultExcel = () => {
+    if (onExportExcel) {
+      onExportExcel();
+    } else if (data && columns) {
+      exportToExcel(data, columns, fileName);
+    } else if (data) {
+      exportToExcel(data, fileName);
+    }
+  };
+
+  const handleDefaultPDF = () => {
+    if (onExportPDF) {
+      onExportPDF();
+    } else if (onPrint) {
+      onPrint();
+    } else {
+      window.print();
+    }
+  };
   const { t, language } = useLanguage();
   const [showExcelMenu, setShowExcelMenu] = useState(false);
   const [showPdfMenu, setShowPdfMenu] = useState(false);
@@ -80,7 +110,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
             if (selectedCount > 0 && onExportExcelSelected) {
               setShowExcelMenu(!showExcelMenu);
             } else {
-              onExportExcel();
+              handleDefaultExcel();
             }
           }}
           className={`${btnBaseClass} bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100`}
@@ -94,7 +124,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
         {showExcelMenu && selectedCount > 0 && (
           <div className="absolute right-0 mt-1.5 w-48 bg-white border border-zinc-150 rounded-2xl shadow-xl z-50 p-1 flex flex-col gap-0.5 animate-in fade-in slide-in-from-top-1 duration-150">
             <button
-              onClick={() => { onExportExcel(); setShowExcelMenu(false); }}
+              onClick={() => { handleDefaultExcel(); setShowExcelMenu(false); }}
               className="w-full text-right px-4 py-2 hover:bg-zinc-50 rounded-xl text-xs font-bold text-zinc-700"
             >
               {isAr ? 'تصدير الكل' : 'Export All'}
@@ -116,7 +146,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
             if (selectedCount > 0 && onExportPDFSelected) {
               setShowPdfMenu(!showPdfMenu);
             } else {
-              onExportPDF();
+              handleDefaultPDF();
             }
           }}
           className={`${btnBaseClass} bg-rose-50 border border-rose-200 text-rose-800 hover:bg-rose-100`}
@@ -130,7 +160,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
         {showPdfMenu && selectedCount > 0 && (
           <div className="absolute right-0 mt-1.5 w-48 bg-white border border-zinc-150 rounded-2xl shadow-xl z-50 p-1 flex flex-col gap-0.5 animate-in fade-in slide-in-from-top-1 duration-150">
             <button
-              onClick={() => { onExportPDF(); setShowPdfMenu(false); }}
+              onClick={() => { handleDefaultPDF(); setShowPdfMenu(false); }}
               className="w-full text-right px-4 py-2 hover:bg-zinc-50 rounded-xl text-xs font-bold text-zinc-700"
             >
               {isAr ? 'تصدير الكل' : 'Export All'}

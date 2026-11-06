@@ -3,7 +3,7 @@ import {
   Building2, Plus, Search, Filter, RefreshCw, Printer, FileSpreadsheet, 
   Calculator, User, DollarSign, Layers, ChevronLeft, ChevronRight,
   TrendingUp, Wrench, AlertTriangle, CheckCircle2, Clock, MoreVertical,
-  Eye, Edit3, Trash2, ArrowRightLeft, ShieldCheck, BarChart3, HelpCircle
+  Eye, Edit3, Trash2, ArrowRightLeft, ShieldCheck, BarChart3, HelpCircle, Copy, FileText
 } from 'lucide-react';
 import { FixedAsset, AssetCategory, AssetDashboardStats, AssetDepreciationRun } from '../types/fixedAssets';
 import { fixedAssetService } from '../services/fixedAssetService';
@@ -170,6 +170,95 @@ export const FixedAssets: React.FC<FixedAssetsProps> = ({ initialTab = 'dashboar
   const handleOpenEdit = (asset: FixedAsset) => {
     setAssetToEdit(asset);
     setIsFormModalOpen(true);
+  };
+
+  const handleCopyAsset = (asset: FixedAsset) => {
+    const copiedAsset: FixedAsset = {
+      ...asset,
+      id: '',
+      asset_number: '',
+      name: `${asset.name} (نسخة)`,
+      status: 'DRAFT',
+      accumulated_depreciation: 0,
+      net_book_value: asset.capitalized_cost || asset.acquisition_cost || 0
+    };
+    setAssetToEdit(copiedAsset);
+    setIsFormModalOpen(true);
+    showSuccess('تم نسخ بيانات الأصل، يمكنك التعديل والحفظ كأصل جديد');
+  };
+
+  const handlePrintAsset = (asset: FixedAsset) => {
+    window.dispatchEvent(new CustomEvent('erp-print-document', {
+      detail: {
+        operationType: 'fixed_asset',
+        documentId: asset.id,
+        documentData: {
+          ...asset,
+          doc_number: asset.asset_number,
+          date: asset.acquisition_date || asset.capitalization_date || '',
+          customer_name: asset.custodian_name || asset.department_name || '-',
+          warehouse_name: asset.warehouse_name || asset.location_name || '-',
+          total_amount: asset.capitalized_cost || asset.acquisition_cost || 0,
+          notes: (asset as any).notes || ''
+        }
+      }
+    }));
+  };
+
+  const handleExportSingleAssetExcel = (asset: FixedAsset) => {
+    const exportRows = [{
+      'رقم الأصل': asset.asset_number,
+      'اسم الأصل': asset.name,
+      'التصنيف': asset.category_name || 'غير مصنف',
+      'الفرع / المخزن': asset.warehouse_name || 'المركز الرئيسي',
+      'القسم': asset.department_name || 'عام',
+      'العهدة': asset.custodian_name || '---',
+      'تاريخ الشراء': asset.acquisition_date,
+      'التكلفة المرسملة': asset.capitalized_cost,
+      'مجمع الإهلاك': asset.accumulated_depreciation,
+      'صافي القيمة الدفترية': asset.net_book_value,
+      'الحالة': asset.status
+    }];
+    const ws = XLSX.utils.json_to_sheet(exportRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'FixedAsset');
+    XLSX.writeFile(wb, `Asset_${asset.asset_number}.xlsx`);
+  };
+
+  const handlePrintDeprRun = (run: AssetDepreciationRun) => {
+    window.dispatchEvent(new CustomEvent('erp-print-document', {
+      detail: {
+        operationType: 'depreciation',
+        documentId: run.id,
+        documentData: {
+          ...run,
+          doc_number: run.run_number,
+          date: run.to_date || run.from_date,
+          customer_name: run.period_name,
+          total_amount: run.total_depreciation,
+          notes: `عدد الأصول: ${run.total_assets} - القيد: ${run.journal_entry_number || ''}`
+        }
+      }
+    }));
+  };
+
+  const handleExportDeprRunsExcel = (singleRun?: AssetDepreciationRun) => {
+    const list = singleRun ? [singleRun] : deprRuns;
+    if (list.length === 0) return;
+    const rows = list.map(r => ({
+      'رقم الدورة': r.run_number,
+      'الفترة المحاسبية': r.period_name,
+      'من تاريخ': r.from_date,
+      'إلى تاريخ': r.to_date,
+      'عدد الأصول': r.total_assets,
+      'إجمالي الإهلاك المرحل': r.total_depreciation,
+      'رقم قيد اليومية': r.journal_entry_number || 'قيد مرحل',
+      'المستخدم': r.created_by
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'DepreciationRuns');
+    XLSX.writeFile(wb, singleRun ? `Depreciation_${singleRun.run_number}.xlsx` : `Depreciation_Runs_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   const handleOpenDetails = (asset: FixedAsset) => {
@@ -542,6 +631,23 @@ export const FixedAssets: React.FC<FixedAssetsProps> = ({ initialTab = 'dashboar
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               </button>
               <button
+                onClick={() => window.print()}
+                className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-colors"
+              >
+                <Printer className="w-4 h-4 text-blue-400" />
+                طابعة
+              </button>
+              <button
+                onClick={() => {
+                  if (filteredAssets[0]) handlePrintAsset(filteredAssets[0]);
+                  else window.print();
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-colors"
+              >
+                <FileText className="w-4 h-4 text-rose-400" />
+                تصدير PDF
+              </button>
+              <button
                 onClick={exportRegisterExcel}
                 className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-colors"
               >
@@ -620,6 +726,27 @@ export const FixedAssets: React.FC<FixedAssetsProps> = ({ initialTab = 'dashboar
                             title="بطاقة الأصل 360"
                           >
                             <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleCopyAsset(asset)}
+                            className="p-1.5 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 rounded-lg transition-colors"
+                            title="نسخ الأصل"
+                          >
+                            <Copy className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handlePrintAsset(asset)}
+                            className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-colors"
+                            title="طباعة / تصدير PDF"
+                          >
+                            <Printer className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleExportSingleAssetExcel(asset)}
+                            className="p-1.5 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                            title="تصدير Excel"
+                          >
+                            <FileSpreadsheet className="w-4 h-4" />
                           </button>
 
                           {/* Capitalize Button (if Draft) */}
@@ -708,18 +835,41 @@ export const FixedAssets: React.FC<FixedAssetsProps> = ({ initialTab = 'dashboar
       {/* ========================================================= */}
       {activeTab === 'depreciation' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 className="text-sm font-bold text-white">سجل دورات الإهلاك الدوري السابقة</h3>
               <p className="text-xs text-slate-400">كافة دورات الإهلاك التي تم تشغيلها وترحيل قيودها بدفتر اليومية العام</p>
             </div>
-            <button
-              onClick={() => setIsDeprRunModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-amber-600/20"
-            >
-              <Calculator className="w-4 h-4" />
-              تشغيل دورة إهلاك جديدة
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => window.print()}
+                className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-colors"
+              >
+                <Printer className="w-4 h-4 text-blue-400" />
+                طابعة
+              </button>
+              <button
+                onClick={() => deprRuns[0] ? handlePrintDeprRun(deprRuns[0]) : window.print()}
+                className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-colors"
+              >
+                <FileText className="w-4 h-4 text-rose-400" />
+                تصدير PDF
+              </button>
+              <button
+                onClick={() => handleExportDeprRunsExcel()}
+                className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-colors"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                تصدير Excel
+              </button>
+              <button
+                onClick={() => setIsDeprRunModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-amber-600/20"
+              >
+                <Calculator className="w-4 h-4" />
+                تشغيل دورة إهلاك جديدة
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto border border-slate-800 rounded-2xl bg-slate-900/60">
@@ -735,12 +885,13 @@ export const FixedAssets: React.FC<FixedAssetsProps> = ({ initialTab = 'dashboar
                   <th className="p-3">رقم قيد اليومية</th>
                   <th className="p-3">المستخدم</th>
                   <th className="p-3 text-center">الحالة</th>
+                  <th className="p-3 text-center">إجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {deprRuns.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="p-12 text-center text-slate-500">
+                    <td colSpan={10} className="p-12 text-center text-slate-500">
                       لم يتم تشغيل أي دورات إهلاك سابقة حتى الآن.
                     </td>
                   </tr>
@@ -763,6 +914,31 @@ export const FixedAssets: React.FC<FixedAssetsProps> = ({ initialTab = 'dashboar
                         <span className="px-2.5 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-[10px] font-bold">
                           تم الترحيل (POSTED)
                         </span>
+                      </td>
+                      <td className="p-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => setIsDeprRunModalOpen(true)}
+                            className="p-1.5 text-indigo-400 hover:bg-indigo-500/10 rounded-lg"
+                            title="نسخ / دورة جديدة"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handlePrintDeprRun(run)}
+                            className="p-1.5 text-blue-400 hover:bg-blue-500/10 rounded-lg"
+                            title="طباعة / PDF"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleExportDeprRunsExcel(run)}
+                            className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded-lg"
+                            title="تصدير Excel"
+                          >
+                            <FileSpreadsheet className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -809,6 +985,9 @@ export const FixedAssets: React.FC<FixedAssetsProps> = ({ initialTab = 'dashboar
         onMaintain={asset => { setIsDetailsModalOpen(false); setOperationAsset(asset); setIsMaintenanceModalOpen(true); }}
         onRevalue={asset => { setIsDetailsModalOpen(false); setOperationAsset(asset); setIsRevaluationModalOpen(true); }}
         onDispose={asset => { setIsDetailsModalOpen(false); setOperationAsset(asset); setIsDisposalModalOpen(true); }}
+        onCopy={asset => { setIsDetailsModalOpen(false); handleCopyAsset(asset); }}
+        onPrint={asset => handlePrintAsset(asset)}
+        onExportExcel={asset => handleExportSingleAssetExcel(asset)}
       />
 
       {/* 3. Centralized Depreciation Run Modal */}

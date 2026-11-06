@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { Customer, Account, Currency, Company } from '../types';
-import { Search, Trash2, X, Layers, User, Calendar, RotateCcw, ChevronDown, Check, AlertCircle, Info, ArrowLeftRight, LayoutGrid, SlidersHorizontal, ExternalLink, Download, Edit3, ArrowUpDown, CheckSquare, Square, Filter, Coins } from 'lucide-react';
+import { Search, Trash2, X, Layers, User, Calendar, RotateCcw, ChevronDown, Check, AlertCircle, Info, ArrowLeftRight, LayoutGrid, SlidersHorizontal, ExternalLink, Download, Edit3, ArrowUpDown, CheckSquare, Square, Filter, Coins, Copy, Printer, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
@@ -2029,6 +2029,50 @@ export const CustomerSettlements: React.FC = () => {
     });
   };
 
+  const handleCopySettlement = (h: any) => {
+    const custId = h.entity_id || customers.find(c => c.name === h.entity_name)?.id || '';
+    setEditingSettlementNum(null);
+    setSelectedCustomerId(custId);
+    setSettlementDate(new Date().toISOString().slice(0, 10));
+    setActiveTab('new');
+    setSelectedHistory(null);
+    showNotification(language === 'ar' ? `تم نسخ بيانات تسوية العميل (${h.entity_name}) كمسودة جديدة` : 'Settlement copied as new draft', 'success');
+  };
+
+  const handlePrintSettlement = (h: any) => {
+    const items = [
+      ...(h.debitDocs || []).map((doc: any) => ({
+        doc_type: `${doc.type_label} (مدين)`,
+        doc_number: doc.number,
+        doc_date: formatDate(doc.date),
+        original_amount: doc.amount,
+        settled_amount: doc.amount
+      })),
+      ...(h.creditDocs || []).map((doc: any) => ({
+        doc_type: `${doc.type_label} (دائن)`,
+        doc_number: doc.number,
+        doc_date: formatDate(doc.date),
+        original_amount: doc.amount,
+        settled_amount: doc.amount
+      }))
+    ];
+    window.dispatchEvent(new CustomEvent('erp-print-document', {
+      detail: {
+        operationType: 'customer_settlement',
+        documentId: h.settlement_number,
+        documentData: {
+          id: h.settlement_number,
+          invoice_number: h.settlement_number,
+          number: h.settlement_number,
+          date: h.date,
+          customer_name: h.entity_name,
+          total_amount: h.total_amount,
+          items
+        }
+      }
+    }));
+  };
+
   // Rollback Settlement
   const handleDeleteSettlement = async (settlementNumber: string, customerName: string) => {
     if (!user) return;
@@ -3158,6 +3202,30 @@ export const CustomerSettlements: React.FC = () => {
                               {language === 'ar' ? 'عرض التفاصيل' : 'View Details'}
                             </button>
                             <button
+                              onClick={() => handleCopySettlement(h)}
+                              className="px-2 py-0.5 text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md hover:bg-indigo-100 transition-all flex items-center gap-1"
+                              title={language === 'ar' ? 'نسخ التسوية' : 'Copy'}
+                            >
+                              <Copy size={11} />
+                              <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+                            </button>
+                            <button
+                              onClick={() => handlePrintSettlement(h)}
+                              className="px-2 py-0.5 text-[11px] font-bold bg-zinc-100 text-zinc-700 border border-zinc-200 rounded-md hover:bg-zinc-200 transition-all flex items-center gap-1"
+                              title={language === 'ar' ? 'طباعة' : 'Print'}
+                            >
+                              <Printer size={11} />
+                              <span>{language === 'ar' ? 'طابعة' : 'Print'}</span>
+                            </button>
+                            <button
+                              onClick={() => handlePrintSettlement(h)}
+                              className="px-2 py-0.5 text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 rounded-md hover:bg-rose-100 transition-all flex items-center gap-1"
+                              title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
+                            >
+                              <FileText size={11} />
+                              <span>PDF</span>
+                            </button>
+                            <button
                               onClick={() => handleExportSettlementExcel(h)}
                               className="px-2 py-0.5 text-[11px] font-bold bg-white text-blue-600 border border-blue-200 rounded-md hover:bg-blue-50 transition-all flex items-center gap-1 shadow-sm"
                             >
@@ -3195,8 +3263,29 @@ export const CustomerSettlements: React.FC = () => {
             >
               <div className="p-6 border-b border-zinc-100 bg-zinc-50 flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-bold text-zinc-900 flex items-center gap-3">
+                  <h3 className="text-lg font-bold text-zinc-900 flex flex-wrap items-center gap-2">
                     <span>{language === 'ar' ? 'تفاصيل التسوية:' : 'Settlement Details:'} {selectedHistory.settlement_number}</span>
+                    <button
+                      onClick={() => handleCopySettlement(selectedHistory)}
+                      className="px-2.5 py-1 text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-all flex items-center gap-1 shadow-sm"
+                    >
+                      <Copy size={12} />
+                      <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+                    </button>
+                    <button
+                      onClick={() => handlePrintSettlement(selectedHistory)}
+                      className="px-2.5 py-1 text-xs font-bold bg-white text-zinc-700 border border-zinc-200 rounded-lg hover:bg-zinc-100 transition-all flex items-center gap-1 shadow-sm"
+                    >
+                      <Printer size={12} />
+                      <span>{language === 'ar' ? 'طابعة' : 'Print'}</span>
+                    </button>
+                    <button
+                      onClick={() => handlePrintSettlement(selectedHistory)}
+                      className="px-2.5 py-1 text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 rounded-lg hover:bg-rose-100 transition-all flex items-center gap-1 shadow-sm"
+                    >
+                      <FileText size={12} />
+                      <span>PDF</span>
+                    </button>
                     <button
                       onClick={() => handleExportSettlementExcel(selectedHistory)}
                       className="px-3 py-1 text-xs font-bold bg-white text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-all flex items-center gap-1 shadow-sm"

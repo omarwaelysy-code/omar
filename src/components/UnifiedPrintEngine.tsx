@@ -322,24 +322,24 @@ export function UnifiedPrintEngine() {
   useEffect(() => {
     const handlePrintEvent = async (e: Event) => {
       const customEvent = e as CustomEvent;
-      const { operationType: opType, documentId: docId, templateId, profileId } = customEvent.detail;
+      const { operationType: opType, documentId: docId, documentData: inlineDocData, templateId, profileId } = customEvent.detail;
       
       setOperationType(opType);
-      setDocumentId(docId);
+      setDocumentId(docId || 'inline');
       setIsOpen(true);
       setLoading(true);
 
       try {
         // Fetch core data
         const [docVal, allTemplates, allProfiles, allSizes, companyData] = await Promise.all([
-          dbService.get<any>(opType, docId),
+          inlineDocData ? Promise.resolve(inlineDocData) : (docId ? dbService.get<any>(opType, docId).catch(() => null) : Promise.resolve(null)),
           dbService.list<Template>('templates', user?.company_id || ''),
           dbService.list<PrintProfile>('print_profiles', user?.company_id || ''),
           dbService.list<PaperSize>('paper_sizes', user?.company_id || ''),
           user?.company_id ? dbService.get<any>('companies', user.company_id) : Promise.resolve(null)
         ]);
 
-        setDocumentData(docVal);
+        setDocumentData(docVal || inlineDocData);
         setPaperSizes(allSizes);
         setCompany(companyData);
 
