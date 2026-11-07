@@ -85,8 +85,8 @@ export function EtaSettings() {
     tested_at?: string;
   } | null>(null);
 
-  const [showClientSecret, setShowClientSecret] = useState(false);
-  const [showOperatingKey, setShowOperatingKey] = useState(false);
+  const [showClientSecret, setShowClientSecret] = useState(true);
+  const [showOperatingKey, setShowOperatingKey] = useState(true);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const handleCopyToClipboard = (text: string, fieldKey: string) => {
@@ -113,23 +113,26 @@ export function EtaSettings() {
 
         // Load ETA settings for the active company
         const etaRes = await apiRequest<any>('/company/eta-settings');
-        if (etaRes && etaRes.data) {
+        const etaData = etaRes?.data || etaRes;
+        if (etaData && typeof etaData === 'object') {
+          const hasClientId = Boolean(etaData.client_id && String(etaData.client_id).trim() !== '');
+          const hasSecret = Boolean(etaData.client_secret_configured || (etaData.client_secret && String(etaData.client_secret).trim() !== ''));
           setEtaSettings({
-            environment: etaRes.data.environment === 'preprod' ? 'preprod' : 'production',
-            activity_code: etaRes.data.activity_code || '',
-            branch_id: etaRes.data.branch_id || '0',
-            country_code: etaRes.data.country_code || 'EG',
-            governorate: etaRes.data.governorate || '',
-            city: etaRes.data.city || '',
-            street: etaRes.data.street || '',
-            building_number: etaRes.data.building_number || '',
-            postal_code: etaRes.data.postal_code || '',
-            client_id: etaRes.data.client_id || '',
-            client_secret: etaRes.data.client_secret || '',
-            client_secret_configured: Boolean(etaRes.data.client_secret_configured),
-            operating_key: etaRes.data.operating_key || '',
-            operating_key_configured: Boolean(etaRes.data.operating_key_configured),
-            is_configured: Boolean(etaRes.data.is_configured)
+            environment: etaData.environment === 'preprod' ? 'preprod' : 'production',
+            activity_code: etaData.activity_code || '',
+            branch_id: etaData.branch_id || '0',
+            country_code: etaData.country_code || 'EG',
+            governorate: etaData.governorate || '',
+            city: etaData.city || '',
+            street: etaData.street || '',
+            building_number: etaData.building_number || '',
+            postal_code: etaData.postal_code || '',
+            client_id: etaData.client_id || '',
+            client_secret: etaData.client_secret || '',
+            client_secret_configured: hasSecret,
+            operating_key: etaData.operating_key || '',
+            operating_key_configured: Boolean(etaData.operating_key_configured || (etaData.operating_key && String(etaData.operating_key).trim() !== '')),
+            is_configured: Boolean(etaData.is_configured || (hasClientId && hasSecret))
           });
         }
       } catch (err: any) {

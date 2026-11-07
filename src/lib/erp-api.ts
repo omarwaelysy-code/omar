@@ -16686,7 +16686,7 @@ router.get(['/company/eta-settings', '/eta/settings'], authenticateToken, async 
 
     if (rows.length === 0) {
       // Return default unconfigured template for this company
-      return res.json({
+      const defaultPayload = {
         company_id: companyId,
         environment: 'preprod',
         activity_code: '',
@@ -16705,13 +16705,21 @@ router.get(['/company/eta-settings', '/eta/settings'], authenticateToken, async 
         is_configured: false,
         documents_count: documentsCount,
         has_documents: hasDocuments
+      };
+      return res.json({
+        ...defaultPayload,
+        data: defaultPayload
       });
     }
 
-    res.json({
+    const rowPayload = {
       ...rows[0],
       documents_count: documentsCount,
       has_documents: hasDocuments
+    };
+    res.json({
+      ...rowPayload,
+      data: rowPayload
     });
   } catch (err: any) {
     console.error('Error fetching ETA settings:', err);
